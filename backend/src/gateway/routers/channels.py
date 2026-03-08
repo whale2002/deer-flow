@@ -1,4 +1,4 @@
-"""Gateway router for IM channel management."""
+"""IM 渠道管理的网关路由。"""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ class ChannelRestartResponse(BaseModel):
 
 @router.get("/", response_model=ChannelStatusResponse)
 async def get_channels_status() -> ChannelStatusResponse:
-    """Get the status of all IM channels."""
+    """获取所有 IM 渠道的状态。"""
     from src.channels.service import get_channel_service
 
     service = get_channel_service()
@@ -36,17 +36,17 @@ async def get_channels_status() -> ChannelStatusResponse:
 
 @router.post("/{name}/restart", response_model=ChannelRestartResponse)
 async def restart_channel(name: str) -> ChannelRestartResponse:
-    """Restart a specific IM channel."""
+    """重启特定的 IM 渠道。"""
     from src.channels.service import get_channel_service
 
     service = get_channel_service()
     if service is None:
-        raise HTTPException(status_code=503, detail="Channel service is not running")
+        raise HTTPException(status_code=503, detail="渠道服务 (Channel service) 未运行")
 
     success = await service.restart_channel(name)
     if success:
         logger.info("Channel %s restarted successfully", name)
-        return ChannelRestartResponse(success=True, message=f"Channel {name} restarted successfully")
+        return ChannelRestartResponse(success=True, message=f"渠道 {name} 重启成功")
     else:
         logger.warning("Failed to restart channel %s", name)
-        return ChannelRestartResponse(success=False, message=f"Failed to restart channel {name}")
+        return ChannelRestartResponse(success=False, message=f"重启渠道 {name} 失败")

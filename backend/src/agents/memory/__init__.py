@@ -1,9 +1,9 @@
-"""Memory module for DeerFlow.
+"""DeerFlow 的记忆模块。
 
-This module provides a global memory mechanism that:
-- Stores user context and conversation history in memory.json
-- Uses LLM to summarize and extract facts from conversations
-- Injects relevant memory into system prompts for personalized responses
+此模块提供全局记忆机制：
+- 将用户上下文和对话历史存储在 memory.json 中
+- 使用 LLM 对对话进行总结并提取事实
+- 将相关记忆注入系统 Prompt 以实现个性化响应
 """
 
 from src.agents.memory.prompt import (
@@ -26,17 +26,17 @@ from src.agents.memory.updater import (
 )
 
 __all__ = [
-    # Prompt utilities
+    # Prompt 工具
     "MEMORY_UPDATE_PROMPT",
     "FACT_EXTRACTION_PROMPT",
     "format_memory_for_injection",
     "format_conversation_for_update",
-    # Queue
+    # 队列（Queue）
     "ConversationContext",
     "MemoryUpdateQueue",
     "get_memory_queue",
     "reset_memory_queue",
-    # Updater
+    # 更新器（Updater）
     "MemoryUpdater",
     "get_memory_data",
     "reload_memory_data",

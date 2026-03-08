@@ -1,4 +1,4 @@
-"""Memory update queue with debounce mechanism."""
+"""带防抖机制的记忆更新队列。"""
 
 import threading
 import time
@@ -11,7 +11,7 @@ from src.config.memory_config import get_memory_config
 
 @dataclass
 class ConversationContext:
-    """Context for a conversation to be processed for memory update."""
+    """待处理记忆更新的对话上下文（类似于 Redux Store 中的一次状态更新）。"""
 
     thread_id: str
     messages: list[Any]
@@ -20,27 +20,26 @@ class ConversationContext:
 
 
 class MemoryUpdateQueue:
-    """Queue for memory updates with debounce mechanism.
+    """带防抖（Debounce）机制的记忆更新队列。
 
-    This queue collects conversation contexts and processes them after
-    a configurable debounce period. Multiple conversations received within
-    the debounce window are batched together.
+    此队列收集对话上下文，并在可配置的防抖周期后处理它们。
+    在防抖窗口内接收到的多个对话会被批量处理（类似于前端输入框的防抖，避免频繁触发后端请求）。
     """
 
     def __init__(self):
-        """Initialize the memory update queue."""
+        """初始化记忆更新队列。"""
         self._queue: list[ConversationContext] = []
         self._lock = threading.Lock()
         self._timer: threading.Timer | None = None
         self._processing = False
 
     def add(self, thread_id: str, messages: list[Any], agent_name: str | None = None) -> None:
-        """Add a conversation to the update queue.
+        """将对话添加到更新队列中。
 
         Args:
-            thread_id: The thread ID.
-            messages: The conversation messages.
-            agent_name: If provided, memory is stored per-agent. If None, uses global memory.
+            thread_id: 线程 ID。
+            messages: 对话消息列表（Array）。
+            agent_name: 如果提供，则按 Agent 存储记忆；如果为 None，则使用全局记忆。
         """
         config = get_memory_config()
         if not config.enabled:
@@ -53,25 +52,25 @@ class MemoryUpdateQueue:
         )
 
         with self._lock:
-            # Check if this thread already has a pending update
-            # If so, replace it with the newer one
+            # 检查此线程是否已有待处理的更新
+            # 如果有，用新的更新替换它（覆盖旧状态）
             self._queue = [c for c in self._queue if c.thread_id != thread_id]
             self._queue.append(context)
 
-            # Reset or start the debounce timer
+            # 重置或启动防抖定时器
             self._reset_timer()
 
         print(f"Memory update queued for thread {thread_id}, queue size: {len(self._queue)}")
 
     def _reset_timer(self) -> None:
-        """Reset the debounce timer."""
+        """重置防抖定时器。"""
         config = get_memory_config()
 
-        # Cancel existing timer if any
+        # 如果存在现有定时器，则取消它（clearTimeout）
         if self._timer is not None:
             self._timer.cancel()
 
-        # Start new timer
+        # 启动新定时器（setTimeout）
         self._timer = threading.Timer(
             config.debounce_seconds,
             self._process_queue,
@@ -82,13 +81,13 @@ class MemoryUpdateQueue:
         print(f"Memory update timer set for {config.debounce_seconds}s")
 
     def _process_queue(self) -> None:
-        """Process all queued conversation contexts."""
-        # Import here to avoid circular dependency
+        """处理所有排队的对话上下文。"""
+        # 在此处导入以避免循环依赖（Circular Dependency）
         from src.agents.memory.updater import MemoryUpdater
 
         with self._lock:
             if self._processing:
-                # Already processing, reschedule
+                # 正在处理中，重新调度
                 self._reset_timer()
                 return
 
@@ -120,7 +119,7 @@ class MemoryUpdateQueue:
                 except Exception as e:
                     print(f"Error updating memory for thread {context.thread_id}: {e}")
 
-                # Small delay between updates to avoid rate limiting
+                # 更新之间的小延迟，以避免速率限制（Rate Limiting）
                 if len(contexts_to_process) > 1:
                     time.sleep(0.5)
 
@@ -129,9 +128,9 @@ class MemoryUpdateQueue:
                 self._processing = False
 
     def flush(self) -> None:
-        """Force immediate processing of the queue.
+        """强制立即处理队列。
 
-        This is useful for testing or graceful shutdown.
+        这对于测试或优雅关闭（Graceful Shutdown）很有用。
         """
         with self._lock:
             if self._timer is not None:
@@ -141,9 +140,9 @@ class MemoryUpdateQueue:
         self._process_queue()
 
     def clear(self) -> None:
-        """Clear the queue without processing.
+        """清空队列而不处理。
 
-        This is useful for testing.
+        这对于测试很有用。
         """
         with self._lock:
             if self._timer is not None:
@@ -154,27 +153,27 @@ class MemoryUpdateQueue:
 
     @property
     def pending_count(self) -> int:
-        """Get the number of pending updates."""
+        """获取待处理更新的数量。"""
         with self._lock:
             return len(self._queue)
 
     @property
     def is_processing(self) -> bool:
-        """Check if the queue is currently being processed."""
+        """检查队列当前是否正在被处理。"""
         with self._lock:
             return self._processing
 
 
-# Global singleton instance
+# 全局单例实例（Singleton Instance）
 _memory_queue: MemoryUpdateQueue | None = None
 _queue_lock = threading.Lock()
 
 
 def get_memory_queue() -> MemoryUpdateQueue:
-    """Get the global memory update queue singleton.
+    """获取全局记忆更新队列单例。
 
     Returns:
-        The memory update queue instance.
+        记忆更新队列实例。
     """
     global _memory_queue
     with _queue_lock:
@@ -184,9 +183,9 @@ def get_memory_queue() -> MemoryUpdateQueue:
 
 
 def reset_memory_queue() -> None:
-    """Reset the global memory queue.
+    """重置全局记忆队列。
 
-    This is useful for testing.
+    这对于测试很有用。
     """
     global _memory_queue
     with _queue_lock:

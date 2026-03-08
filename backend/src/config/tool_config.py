@@ -2,19 +2,19 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ToolGroupConfig(BaseModel):
-    """Config section for a tool group"""
+    """工具组的配置部分"""
 
-    name: str = Field(..., description="Unique name for the tool group")
+    name: str = Field(..., description="工具组的唯一名称")
     model_config = ConfigDict(extra="allow")
 
 
 class ToolConfig(BaseModel):
-    """Config section for a tool"""
+    """工具的配置部分"""
 
-    name: str = Field(..., description="Unique name for the tool")
-    group: str = Field(..., description="Group name for the tool")
+    name: str = Field(..., description="工具的唯一名称")
+    group: str = Field(..., description="工具的组名")
     use: str = Field(
         ...,
-        description="Variable name of the tool provider(e.g. src.sandbox.tools:bash_tool)",
+        description="工具提供者的变量名（例如 src.sandbox.tools:bash_tool）",
     )
     model_config = ConfigDict(extra="allow")

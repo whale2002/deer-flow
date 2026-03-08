@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_model_name(requested_model_name: str | None = None) -> str:
-    """Resolve a runtime model name safely, falling back to default if invalid. Returns None if no models are configured."""
+    """安全地解析运行时模型名称，如果无效则回退到默认值。如果未配置模型则返回 None。"""
     app_config = get_app_config()
     default_model_name = app_config.models[0].name if app_config.models else None
     if default_model_name is None:
@@ -39,13 +39,13 @@ def _resolve_model_name(requested_model_name: str | None = None) -> str:
 
 
 def _create_summarization_middleware() -> SummarizationMiddleware | None:
-    """Create and configure the summarization middleware from config."""
+    """从配置创建并配置摘要中间件。"""
     config = get_summarization_config()
 
     if not config.enabled:
         return None
 
-    # Prepare trigger parameter
+    # 准备 trigger 参数
     trigger = None
     if config.trigger is not None:
         if isinstance(config.trigger, list):
@@ -53,18 +53,18 @@ def _create_summarization_middleware() -> SummarizationMiddleware | None:
         else:
             trigger = config.trigger.to_tuple()
 
-    # Prepare keep parameter
+    # 准备 keep 参数
     keep = config.keep.to_tuple()
 
-    # Prepare model parameter
+    # 准备 model 参数
     if config.model_name:
         model = config.model_name
     else:
-        # Use a lightweight model for summarization to save costs
-        # Falls back to default model if not explicitly specified
+        # 使用轻量级模型进行摘要以节省成本
+        # 如果未显式指定，则回退到默认模型
         model = create_chat_model(thinking_enabled=False)
 
-    # Prepare kwargs
+    # 准备 kwargs
     kwargs = {
         "model": model,
         "trigger": trigger,
@@ -81,18 +81,18 @@ def _create_summarization_middleware() -> SummarizationMiddleware | None:
 
 
 def _create_todo_list_middleware(is_plan_mode: bool) -> TodoListMiddleware | None:
-    """Create and configure the TodoList middleware.
+    """创建并配置 TodoList (待办事项列表) 中间件。
 
     Args:
-        is_plan_mode: Whether to enable plan mode with TodoList middleware.
+        is_plan_mode: 是否启用带有 TodoList 中间件的计划模式。
 
     Returns:
-        TodoListMiddleware instance if plan mode is enabled, None otherwise.
+        如果启用了计划模式，返回 TodoListMiddleware 实例，否则返回 None。
     """
     if not is_plan_mode:
         return None
 
-    # Custom prompts matching DeerFlow's style
+    # 匹配 DeerFlow 风格的自定义 Prompt
     system_prompt = """
 <todo_list_system>
 You have access to the `write_todos` tool to help you manage and track complex multi-step objectives.
@@ -145,10 +145,10 @@ Use this tool in these scenarios:
 ## When NOT to Use
 
 Skip this tool when:
-1. The task is straightforward and takes less than 3 steps
-2. The task is trivial and tracking provides no benefit
-3. The task is purely conversational or informational
-4. It's clear what needs to be done and you can just do it
+1. **The task is straightforward and takes less than 3 steps**
+2. **The task is trivial and tracking provides no benefit**
+3. **The task is purely conversational or informational**
+4. **It's clear what needs to be done and you can just do it**
 
 ## How to Use
 
@@ -195,64 +195,64 @@ Being proactive with task management demonstrates thoroughness and ensures all r
     return TodoListMiddleware(system_prompt=system_prompt, tool_description=tool_description)
 
 
-# ThreadDataMiddleware must be before SandboxMiddleware to ensure thread_id is available
-# UploadsMiddleware should be after ThreadDataMiddleware to access thread_id
-# DanglingToolCallMiddleware patches missing ToolMessages before model sees the history
-# SummarizationMiddleware should be early to reduce context before other processing
-# TodoListMiddleware should be before ClarificationMiddleware to allow todo management
-# TitleMiddleware generates title after first exchange
-# MemoryMiddleware queues conversation for memory update (after TitleMiddleware)
-# ViewImageMiddleware should be before ClarificationMiddleware to inject image details before LLM
-# ClarificationMiddleware should be last to intercept clarification requests after model calls
+# ThreadDataMiddleware 必须在 SandboxMiddleware 之前，以确保 thread_id 可用
+# UploadsMiddleware 应该在 ThreadDataMiddleware 之后，以访问 thread_id
+# DanglingToolCallMiddleware 补全缺失的 ToolMessages，防止模型看到不完整的历史
+# SummarizationMiddleware 应该尽早执行，以便在其他处理之前减少上下文
+# TodoListMiddleware 应该在 ClarificationMiddleware 之前，允许管理待办事项
+# TitleMiddleware 在第一次交换后生成标题
+# MemoryMiddleware 将对话加入记忆更新队列 (在 TitleMiddleware 之后)
+# ViewImageMiddleware 应该在 ClarificationMiddleware 之前，在 LLM 之前注入图片详情
+# ClarificationMiddleware 应该最后执行，以拦截模型调用后的澄清请求
 def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_name: str | None = None):
-    """Build middleware chain based on runtime configuration.
+    """根据运行时配置构建中间件链。
 
     Args:
-        config: Runtime configuration containing configurable options like is_plan_mode.
-        agent_name: If provided, MemoryMiddleware will use per-agent memory storage.
+        config: 包含可配置选项（如 is_plan_mode）的运行时配置。
+        agent_name: 如果提供，MemoryMiddleware 将使用每个 Agent 独立的记忆存储。
 
     Returns:
-        List of middleware instances.
+        中间件实例列表。
     """
     middlewares = [ThreadDataMiddleware(), UploadsMiddleware(), SandboxMiddleware(), DanglingToolCallMiddleware()]
 
-    # Add summarization middleware if enabled
+    # 如果启用，添加摘要中间件
     summarization_middleware = _create_summarization_middleware()
     if summarization_middleware is not None:
         middlewares.append(summarization_middleware)
 
-    # Add TodoList middleware if plan mode is enabled
+    # 如果启用了计划模式，添加 TodoList 中间件
     is_plan_mode = config.get("configurable", {}).get("is_plan_mode", False)
     todo_list_middleware = _create_todo_list_middleware(is_plan_mode)
     if todo_list_middleware is not None:
         middlewares.append(todo_list_middleware)
 
-    # Add TitleMiddleware
+    # 添加 TitleMiddleware (标题生成)
     middlewares.append(TitleMiddleware())
 
-    # Add MemoryMiddleware (after TitleMiddleware)
+    # 添加 MemoryMiddleware (记忆管理，在 TitleMiddleware 之后)
     middlewares.append(MemoryMiddleware(agent_name=agent_name))
 
-    # Add ViewImageMiddleware only if the current model supports vision.
-    # Use the resolved runtime model_name from make_lead_agent to avoid stale config values.
+    # 仅当当前模型支持视觉时添加 ViewImageMiddleware。
+    # 使用从 make_lead_agent 解析的运行时 model_name，避免使用陈旧的配置值。
     app_config = get_app_config()
     model_config = app_config.get_model_config(model_name) if model_name else None
     if model_config is not None and model_config.supports_vision:
         middlewares.append(ViewImageMiddleware())
 
-    # Add SubagentLimitMiddleware to truncate excess parallel task calls
+    # 添加 SubagentLimitMiddleware 以截断过多的并行任务调用
     subagent_enabled = config.get("configurable", {}).get("subagent_enabled", False)
     if subagent_enabled:
         max_concurrent_subagents = config.get("configurable", {}).get("max_concurrent_subagents", 3)
         middlewares.append(SubagentLimitMiddleware(max_concurrent=max_concurrent_subagents))
 
-    # ClarificationMiddleware should always be last
+    # ClarificationMiddleware (澄清) 应该始终排在最后
     middlewares.append(ClarificationMiddleware())
     return middlewares
 
 
 def make_lead_agent(config: RunnableConfig):
-    # Lazy import to avoid circular dependency
+    # 延迟导入以避免循环依赖
     from src.tools import get_available_tools
     from src.tools.builtins import setup_agent
 
@@ -268,10 +268,10 @@ def make_lead_agent(config: RunnableConfig):
     agent_name = cfg.get("agent_name")
 
     agent_config = load_agent_config(agent_name) if not is_bootstrap else None
-    # Custom agent model or fallback to global/default model resolution
+    # 使用自定义 Agent 模型，或回退到全局/默认模型解析
     agent_model_name = agent_config.model if agent_config and agent_config.model else _resolve_model_name()
 
-    # Final model name resolution with request override, then agent config, then global default
+    # 最终模型名称解析：请求覆盖 > Agent 配置 > 全局默认
     model_name = requested_model_name or agent_model_name
 
     app_config = get_app_config()
@@ -294,7 +294,7 @@ def make_lead_agent(config: RunnableConfig):
         max_concurrent_subagents,
     )
 
-    # Inject run metadata for LangSmith trace tagging
+    # 注入运行元数据用于 LangSmith 跟踪标记
     if "metadata" not in config:
         config["metadata"] = {}
 
@@ -310,7 +310,7 @@ def make_lead_agent(config: RunnableConfig):
     )
 
     if is_bootstrap:
-        # Special bootstrap agent with minimal prompt for initial custom agent creation flow
+        # 特殊的引导 Agent，具有最小的 Prompt，用于初始自定义 Agent 创建流程
         system_prompt = apply_prompt_template(subagent_enabled=subagent_enabled, max_concurrent_subagents=max_concurrent_subagents, available_skills=set(["bootstrap"]))
 
         return create_agent(
@@ -321,7 +321,7 @@ def make_lead_agent(config: RunnableConfig):
             state_schema=ThreadState,
         )
 
-    # Default lead agent (unchanged behavior)
+    # 默认的主导 Agent (行为不变)
     return create_agent(
         model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled, reasoning_effort=reasoning_effort),
         tools=get_available_tools(model_name=model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled),

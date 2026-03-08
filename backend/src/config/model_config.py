@@ -2,28 +2,28 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelConfig(BaseModel):
-    """Config section for a model"""
+    """模型的配置部分"""
 
-    name: str = Field(..., description="Unique name for the model")
-    display_name: str | None = Field(..., default_factory=lambda: None, description="Display name for the model")
-    description: str | None = Field(..., default_factory=lambda: None, description="Description for the model")
+    name: str = Field(..., description="模型的唯一名称")
+    display_name: str | None = Field(..., default_factory=lambda: None, description="模型的显示名称")
+    description: str | None = Field(..., default_factory=lambda: None, description="模型描述")
     use: str = Field(
         ...,
-        description="Class path of the model provider(e.g. langchain_openai.ChatOpenAI)",
+        description="模型提供者的类路径（例如 langchain_openai.ChatOpenAI）",
     )
-    model: str = Field(..., description="Model name")
+    model: str = Field(..., description="模型名称")
     model_config = ConfigDict(extra="allow")
-    supports_thinking: bool = Field(default_factory=lambda: False, description="Whether the model supports thinking")
-    supports_reasoning_effort: bool = Field(default_factory=lambda: False, description="Whether the model supports reasoning effort")
+    supports_thinking: bool = Field(default_factory=lambda: False, description="模型是否支持思考（Thinking）")
+    supports_reasoning_effort: bool = Field(default_factory=lambda: False, description="模型是否支持推理力度（Reasoning Effort）")
     when_thinking_enabled: dict | None = Field(
         default_factory=lambda: None,
-        description="Extra settings to be passed to the model when thinking is enabled",
+        description="当启用思考时传递给模型的额外设置",
     )
-    supports_vision: bool = Field(default_factory=lambda: False, description="Whether the model supports vision/image inputs")
+    supports_vision: bool = Field(default_factory=lambda: False, description="模型是否支持视觉/图像输入")
     thinking: dict | None = Field(
         default_factory=lambda: None,
         description=(
-            "Thinking settings for the model. If provided, these settings will be passed to the model when thinking is enabled. "
-            "This is a shortcut for `when_thinking_enabled` and will be merged with `when_thinking_enabled` if both are provided."
+            "模型的思考设置。如果提供，这些设置将在启用思考时传递给模型。"
+            "这是 `when_thinking_enabled` 的快捷方式，如果两者都提供，将与 `when_thinking_enabled` 合并。"
         ),
     )

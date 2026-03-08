@@ -1,4 +1,4 @@
-"""Shared path resolution for thread virtual paths (e.g. mnt/user-data/outputs/...)."""
+"""用于线程虚拟路径（例如 mnt/user-data/outputs/...）的共享路径解析。"""
 
 from pathlib import Path
 
@@ -8,18 +8,18 @@ from src.config.paths import get_paths
 
 
 def resolve_thread_virtual_path(thread_id: str, virtual_path: str) -> Path:
-    """Resolve a virtual path to the actual filesystem path under thread user-data.
+    """将虚拟路径解析为线程 user-data 下的实际文件系统路径。
 
     Args:
-        thread_id: The thread ID.
-        virtual_path: The virtual path as seen inside the sandbox
-                      (e.g., /mnt/user-data/outputs/file.txt).
+        thread_id: 线程 ID。
+        virtual_path: 沙箱内部看到的虚拟路径
+                      （例如 /mnt/user-data/outputs/file.txt）。
 
     Returns:
-        The resolved filesystem path.
+        解析后的文件系统路径。
 
     Raises:
-        HTTPException: If the path is invalid or outside allowed directories.
+        HTTPException: 如果路径无效或在允许的目录之外。
     """
     try:
         return get_paths().resolve_virtual_path(thread_id, virtual_path)

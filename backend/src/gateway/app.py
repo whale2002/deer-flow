@@ -30,72 +30,72 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Application lifespan handler."""
+    """应用程序生命周期处理程序。"""
 
-    # Load config and check necessary environment variables at startup
+    # 启动时加载配置并检查必要的环境变量
     try:
         get_app_config()
-        logger.info("Configuration loaded successfully")
+        logger.info("配置加载成功")
     except Exception as e:
-        error_msg = f"Failed to load configuration during gateway startup: {e}"
+        error_msg = f"网关启动期间加载配置失败: {e}"
         logger.exception(error_msg)
         raise RuntimeError(error_msg) from e
     config = get_gateway_config()
-    logger.info(f"Starting API Gateway on {config.host}:{config.port}")
+    logger.info(f"正在 {config.host}:{config.port} 上启动 API 网关")
 
-    # NOTE: MCP tools initialization is NOT done here because:
-    # 1. Gateway doesn't use MCP tools - they are used by Agents in the LangGraph Server
-    # 2. Gateway and LangGraph Server are separate processes with independent caches
-    # MCP tools are lazily initialized in LangGraph Server when first needed
+    # 注意：MCP 工具初始化不在这里进行，因为：
+    # 1. 网关不使用 MCP 工具 - 它们由 LangGraph Server 中的 Agent 使用
+    # 2. 网关和 LangGraph Server 是具有独立缓存的单独进程
+    # MCP 工具在 LangGraph Server 中首次需要时懒加载初始化
 
-    # Start IM channel service if any channels are configured
+    # 如果配置了任何频道，则启动 IM 频道服务
     try:
         from src.channels.service import start_channel_service
 
         channel_service = await start_channel_service()
-        logger.info("Channel service started: %s", channel_service.get_status())
+        logger.info("频道服务已启动: %s", channel_service.get_status())
     except Exception:
-        logger.exception("No IM channels configured or channel service failed to start")
+        logger.exception("未配置 IM 频道或频道服务启动失败")
 
     yield
 
-    # Stop channel service on shutdown
+    # 关闭时停止频道服务
     try:
         from src.channels.service import stop_channel_service
 
         await stop_channel_service()
     except Exception:
-        logger.exception("Failed to stop channel service")
-    logger.info("Shutting down API Gateway")
+        logger.exception("停止频道服务失败")
+    logger.info("正在关闭 API 网关")
 
 
 def create_app() -> FastAPI:
-    """Create and configure the FastAPI application.
+    """创建并配置 FastAPI 应用程序。
 
     Returns:
-        Configured FastAPI application instance.
+        配置好的 FastAPI 应用程序实例。
     """
 
     app = FastAPI(
         title="DeerFlow API Gateway",
         description="""
-## DeerFlow API Gateway
+## DeerFlow API 网关
 
-API Gateway for DeerFlow - A LangGraph-based AI agent backend with sandbox execution capabilities.
+DeerFlow 的 API 网关 - 基于 LangGraph 的具有沙箱执行能力的 AI Agent 后端。
 
-### Features
+### 功能特性
 
-- **Models Management**: Query and retrieve available AI models
-- **MCP Configuration**: Manage Model Context Protocol (MCP) server configurations
-- **Memory Management**: Access and manage global memory data for personalized conversations
-- **Skills Management**: Query and manage skills and their enabled status
-- **Artifacts**: Access thread artifacts and generated files
-- **Health Monitoring**: System health check endpoints
+- **模型管理**：查询和检索可用的 AI 模型
+- **MCP 配置**：管理模型上下文协议（MCP）服务器配置
+- **记忆管理**：访问和管理全局记忆数据以进行个性化对话
+- **技能管理**：查询和管理技能及其启用状态
+- **产物管理**：访问和下载线程产物及生成的文件
+- **健康监控**：系统健康检查端点
 
-### Architecture
+### 架构
 
-LangGraph requests are handled by nginx reverse proxy.
-This gateway provides custom endpoints for models, MCP configuration, skills, and artifacts.
+LangGraph 请求由 nginx 反向代理处理。
+此网关为模型、MCP 配置、技能和产物提供自定义端点。
         """,
         version="0.1.0",
         lifespan=lifespan,
@@ -105,88 +105,88 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
         openapi_tags=[
             {
                 "name": "models",
-                "description": "Operations for querying available AI models and their configurations",
+                "description": "查询可用 AI 模型及其配置的操作",
             },
             {
                 "name": "mcp",
-                "description": "Manage Model Context Protocol (MCP) server configurations",
+                "description": "管理模型上下文协议（MCP）服务器配置",
             },
             {
                 "name": "memory",
-                "description": "Access and manage global memory data for personalized conversations",
+                "description": "访问和管理全局记忆数据以进行个性化对话",
             },
             {
                 "name": "skills",
-                "description": "Manage skills and their configurations",
+                "description": "管理技能及其配置",
             },
             {
                 "name": "artifacts",
-                "description": "Access and download thread artifacts and generated files",
+                "description": "访问和下载线程产物及生成的文件",
             },
             {
                 "name": "uploads",
-                "description": "Upload and manage user files for threads",
+                "description": "上传和管理线程的用户文件",
             },
             {
                 "name": "agents",
-                "description": "Create and manage custom agents with per-agent config and prompts",
+                "description": "创建和管理具有每个 Agent 配置和提示词的自定义 Agent",
             },
             {
                 "name": "suggestions",
-                "description": "Generate follow-up question suggestions for conversations",
+                "description": "为对话生成后续问题建议",
             },
             {
                 "name": "channels",
-                "description": "Manage IM channel integrations (Feishu, Slack, Telegram)",
+                "description": "管理 IM 频道集成（飞书、Slack、Telegram）",
             },
             {
                 "name": "health",
-                "description": "Health check and system status endpoints",
+                "description": "健康检查和系统状态端点",
             },
         ],
     )
 
-    # CORS is handled by nginx - no need for FastAPI middleware
+    # CORS 由 nginx 处理 - 不需要 FastAPI 中间件
 
-    # Include routers
-    # Models API is mounted at /api/models
+    # 包含路由
+    # Models API 挂载在 /api/models
     app.include_router(models.router)
 
-    # MCP API is mounted at /api/mcp
+    # MCP API 挂载在 /api/mcp
     app.include_router(mcp.router)
 
-    # Memory API is mounted at /api/memory
+    # Memory API 挂载在 /api/memory
     app.include_router(memory.router)
 
-    # Skills API is mounted at /api/skills
+    # Skills API 挂载在 /api/skills
     app.include_router(skills.router)
 
-    # Artifacts API is mounted at /api/threads/{thread_id}/artifacts
+    # Artifacts API 挂载在 /api/threads/{thread_id}/artifacts
     app.include_router(artifacts.router)
 
-    # Uploads API is mounted at /api/threads/{thread_id}/uploads
+    # Uploads API 挂载在 /api/threads/{thread_id}/uploads
     app.include_router(uploads.router)
 
-    # Agents API is mounted at /api/agents
+    # Agents API 挂载在 /api/agents
     app.include_router(agents.router)
 
-    # Suggestions API is mounted at /api/threads/{thread_id}/suggestions
+    # Suggestions API 挂载在 /api/threads/{thread_id}/suggestions
     app.include_router(suggestions.router)
 
-    # Channels API is mounted at /api/channels
+    # Channels API 挂载在 /api/channels
     app.include_router(channels.router)
 
     @app.get("/health", tags=["health"])
     async def health_check() -> dict:
-        """Health check endpoint.
+        """健康检查端点。
 
         Returns:
-            Service health status information.
+            服务健康状态信息。
         """
         return {"status": "healthy", "service": "deer-flow-gateway"}
 
     return app
 
 
-# Create app instance for uvicorn
+# 为 uvicorn 创建应用实例
 app = create_app()

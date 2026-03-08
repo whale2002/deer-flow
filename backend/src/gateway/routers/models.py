@@ -1,3 +1,5 @@
+"""用于模型管理的路由器。"""
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -7,17 +9,17 @@ router = APIRouter(prefix="/api", tags=["models"])
 
 
 class ModelResponse(BaseModel):
-    """Response model for model information."""
+    """模型信息响应模型。"""
 
-    name: str = Field(..., description="Unique identifier for the model")
-    display_name: str | None = Field(None, description="Human-readable name")
-    description: str | None = Field(None, description="Model description")
-    supports_thinking: bool = Field(default=False, description="Whether model supports thinking mode")
-    supports_reasoning_effort: bool = Field(default=False, description="Whether model supports reasoning effort")
+    name: str = Field(..., description="模型的唯一标识符")
+    display_name: str | None = Field(None, description="人类可读的显示名称")
+    description: str | None = Field(None, description="模型描述")
+    supports_thinking: bool = Field(default=False, description="模型是否支持思考模式")
+    supports_reasoning_effort: bool = Field(default=False, description="模型是否支持推理力度")
 
 
 class ModelsListResponse(BaseModel):
-    """Response model for listing all models."""
+    """列出所有模型的响应模型。"""
 
     models: list[ModelResponse]
 
@@ -25,17 +27,17 @@ class ModelsListResponse(BaseModel):
 @router.get(
     "/models",
     response_model=ModelsListResponse,
-    summary="List All Models",
-    description="Retrieve a list of all available AI models configured in the system.",
+    summary="列出所有模型",
+    description="获取系统中配置的所有可用 AI 模型列表。",
 )
 async def list_models() -> ModelsListResponse:
-    """List all available models from configuration.
+    """列出配置中的所有可用模型。
 
-    Returns model information suitable for frontend display,
-    excluding sensitive fields like API keys and internal configuration.
+    返回适合前端显示的模型信息，
+    排除 API 密钥和内部配置等敏感字段。
 
     Returns:
-        A list of all configured models with their metadata.
+        所有已配置模型及其元数据的列表。
 
     Example Response:
         ```json
@@ -74,20 +76,20 @@ async def list_models() -> ModelsListResponse:
 @router.get(
     "/models/{model_name}",
     response_model=ModelResponse,
-    summary="Get Model Details",
-    description="Retrieve detailed information about a specific AI model by its name.",
+    summary="获取模型详情",
+    description="通过名称检索特定 AI 模型的详细信息。",
 )
 async def get_model(model_name: str) -> ModelResponse:
-    """Get a specific model by name.
+    """按名称获取特定模型。
 
     Args:
-        model_name: The unique name of the model to retrieve.
+        model_name: 要检索的模型的唯一名称。
 
     Returns:
-        Model information if found.
+        如果找到则返回模型信息。
 
     Raises:
-        HTTPException: 404 if model not found.
+        HTTPException: 如果未找到模型则返回 404。
 
     Example Response:
         ```json

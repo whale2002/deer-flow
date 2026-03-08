@@ -13,67 +13,67 @@ router = APIRouter(prefix="/api", tags=["mcp"])
 
 
 class McpOAuthConfigResponse(BaseModel):
-    """OAuth configuration for an MCP server."""
+    """MCP 服务器的 OAuth 配置。"""
 
-    enabled: bool = Field(default=True, description="Whether OAuth token injection is enabled")
-    token_url: str = Field(default="", description="OAuth token endpoint URL")
-    grant_type: Literal["client_credentials", "refresh_token"] = Field(default="client_credentials", description="OAuth grant type")
-    client_id: str | None = Field(default=None, description="OAuth client ID")
-    client_secret: str | None = Field(default=None, description="OAuth client secret")
-    refresh_token: str | None = Field(default=None, description="OAuth refresh token")
-    scope: str | None = Field(default=None, description="OAuth scope")
-    audience: str | None = Field(default=None, description="OAuth audience")
-    token_field: str = Field(default="access_token", description="Token response field containing access token")
-    token_type_field: str = Field(default="token_type", description="Token response field containing token type")
-    expires_in_field: str = Field(default="expires_in", description="Token response field containing expires-in seconds")
-    default_token_type: str = Field(default="Bearer", description="Default token type when response omits token_type")
-    refresh_skew_seconds: int = Field(default=60, description="Refresh this many seconds before expiry")
-    extra_token_params: dict[str, str] = Field(default_factory=dict, description="Additional form params sent to token endpoint")
+    enabled: bool = Field(default=True, description="是否启用 OAuth 令牌注入")
+    token_url: str = Field(default="", description="OAuth 令牌端点 URL")
+    grant_type: Literal["client_credentials", "refresh_token"] = Field(default="client_credentials", description="OAuth 授权类型")
+    client_id: str | None = Field(default=None, description="OAuth 客户端 ID")
+    client_secret: str | None = Field(default=None, description="OAuth 客户端密钥")
+    refresh_token: str | None = Field(default=None, description="OAuth 刷新令牌")
+    scope: str | None = Field(default=None, description="OAuth 作用域 (Scope)")
+    audience: str | None = Field(default=None, description="OAuth 受众 (Audience)")
+    token_field: str = Field(default="access_token", description="包含访问令牌的响应字段名")
+    token_type_field: str = Field(default="token_type", description="包含令牌类型的响应字段名")
+    expires_in_field: str = Field(default="expires_in", description="包含过期时间的响应字段名 (秒)")
+    default_token_type: str = Field(default="Bearer", description="当响应省略 token_type 时的默认令牌类型")
+    refresh_skew_seconds: int = Field(default=60, description="在过期前多少秒进行刷新")
+    extra_token_params: dict[str, str] = Field(default_factory=dict, description="发送到令牌端点的额外表单参数")
 
 
 class McpServerConfigResponse(BaseModel):
-    """Response model for MCP server configuration."""
+    """MCP 服务器配置的响应模型。"""
 
-    enabled: bool = Field(default=True, description="Whether this MCP server is enabled")
-    type: str = Field(default="stdio", description="Transport type: 'stdio', 'sse', or 'http'")
-    command: str | None = Field(default=None, description="Command to execute to start the MCP server (for stdio type)")
-    args: list[str] = Field(default_factory=list, description="Arguments to pass to the command (for stdio type)")
-    env: dict[str, str] = Field(default_factory=dict, description="Environment variables for the MCP server")
-    url: str | None = Field(default=None, description="URL of the MCP server (for sse or http type)")
-    headers: dict[str, str] = Field(default_factory=dict, description="HTTP headers to send (for sse or http type)")
-    oauth: McpOAuthConfigResponse | None = Field(default=None, description="OAuth configuration for MCP HTTP/SSE servers")
-    description: str = Field(default="", description="Human-readable description of what this MCP server provides")
+    enabled: bool = Field(default=True, description="是否启用此 MCP 服务器")
+    type: str = Field(default="stdio", description="传输类型: 'stdio', 'sse', 或 'http'")
+    command: str | None = Field(default=None, description="启动 MCP 服务器的命令 (仅限 stdio 类型)")
+    args: list[str] = Field(default_factory=list, description="传递给命令的参数 (仅限 stdio 类型)")
+    env: dict[str, str] = Field(default_factory=dict, description="MCP 服务器的环境变量")
+    url: str | None = Field(default=None, description="MCP 服务器的 URL (仅限 sse 或 http 类型)")
+    headers: dict[str, str] = Field(default_factory=dict, description="发送的 HTTP 标头 (仅限 sse 或 http 类型)")
+    oauth: McpOAuthConfigResponse | None = Field(default=None, description="MCP HTTP/SSE 服务器的 OAuth 配置")
+    description: str = Field(default="", description="此 MCP 服务器提供功能的易读描述")
 
 
 class McpConfigResponse(BaseModel):
-    """Response model for MCP configuration."""
+    """MCP 配置的响应模型。"""
 
     mcp_servers: dict[str, McpServerConfigResponse] = Field(
         default_factory=dict,
-        description="Map of MCP server name to configuration",
+        description="MCP 服务器名称到配置的映射",
     )
 
 
 class McpConfigUpdateRequest(BaseModel):
-    """Request model for updating MCP configuration."""
+    """更新 MCP 配置的请求模型。"""
 
     mcp_servers: dict[str, McpServerConfigResponse] = Field(
         ...,
-        description="Map of MCP server name to configuration",
+        description="MCP 服务器名称到配置的映射",
     )
 
 
 @router.get(
     "/mcp/config",
     response_model=McpConfigResponse,
-    summary="Get MCP Configuration",
-    description="Retrieve the current Model Context Protocol (MCP) server configurations.",
+    summary="获取 MCP 配置",
+    description="检索当前的模型上下文协议 (MCP) 服务器配置。",
 )
 async def get_mcp_configuration() -> McpConfigResponse:
-    """Get the current MCP configuration.
+    """获取当前的 MCP 配置。
 
     Returns:
-        The current MCP configuration with all servers.
+        包含所有服务器的当前 MCP 配置。
 
     Example:
         ```json
@@ -84,7 +84,7 @@ async def get_mcp_configuration() -> McpConfigResponse:
                     "command": "npx",
                     "args": ["-y", "@modelcontextprotocol/server-github"],
                     "env": {"GITHUB_TOKEN": "ghp_xxx"},
-                    "description": "GitHub MCP server for repository operations"
+                    "description": "用于仓库操作的 GitHub MCP 服务器"
                 }
             }
         }
@@ -98,25 +98,25 @@ async def get_mcp_configuration() -> McpConfigResponse:
 @router.put(
     "/mcp/config",
     response_model=McpConfigResponse,
-    summary="Update MCP Configuration",
-    description="Update Model Context Protocol (MCP) server configurations and save to file.",
+    summary="更新 MCP 配置",
+    description="更新模型上下文协议 (MCP) 服务器配置并保存到文件。",
 )
 async def update_mcp_configuration(request: McpConfigUpdateRequest) -> McpConfigResponse:
-    """Update the MCP configuration.
+    """更新 MCP 配置。
 
-    This will:
-    1. Save the new configuration to the mcp_config.json file
-    2. Reload the configuration cache
-    3. Reset MCP tools cache to trigger reinitialization
+    此操作将：
+    1. 将新配置保存到 mcp_config.json 文件
+    2. 重新加载配置缓存
+    3. 重置 MCP 工具缓存以触发重新初始化
 
     Args:
-        request: The new MCP configuration to save.
+        request: 要保存的新 MCP 配置。
 
     Returns:
-        The updated MCP configuration.
+        更新后的 MCP 配置。
 
     Raises:
-        HTTPException: 500 if the configuration file cannot be written.
+        HTTPException: 如果无法写入配置文件，返回 500 错误。
 
     Example Request:
         ```json
@@ -127,43 +127,43 @@ async def update_mcp_configuration(request: McpConfigUpdateRequest) -> McpConfig
                     "command": "npx",
                     "args": ["-y", "@modelcontextprotocol/server-github"],
                     "env": {"GITHUB_TOKEN": "$GITHUB_TOKEN"},
-                    "description": "GitHub MCP server for repository operations"
+                    "description": "用于仓库操作的 GitHub MCP 服务器"
                 }
             }
         }
         ```
     """
     try:
-        # Get the current config path (or determine where to save it)
+        # 获取当前配置路径 (或确定保存位置)
         config_path = ExtensionsConfig.resolve_config_path()
 
-        # If no config file exists, create one in the parent directory (project root)
+        # 如果不存在配置文件，则在父目录 (项目根目录) 中创建一个
         if config_path is None:
             config_path = Path.cwd().parent / "extensions_config.json"
-            logger.info(f"No existing extensions config found. Creating new config at: {config_path}")
+            logger.info(f"未找到现有的扩展配置。在以下位置创建新配置: {config_path}")
 
-        # Load current config to preserve skills configuration
+        # 加载当前配置以保留 skills 配置
         current_config = get_extensions_config()
 
-        # Convert request to dict format for JSON serialization
+        # 将请求转换为 dict 格式以进行 JSON 序列化
         config_data = {
             "mcpServers": {name: server.model_dump() for name, server in request.mcp_servers.items()},
             "skills": {name: {"enabled": skill.enabled} for name, skill in current_config.skills.items()},
         }
 
-        # Write the configuration to file
+        # 将配置写入文件
         with open(config_path, "w") as f:
             json.dump(config_data, f, indent=2)
 
         logger.info(f"MCP configuration updated and saved to: {config_path}")
 
-        # NOTE: No need to reload/reset cache here - LangGraph Server (separate process)
-        # will detect config file changes via mtime and reinitialize MCP tools automatically
+        # 注意：此处无需重新加载/重置缓存 - LangGraph Server (独立进程)
+        # 会通过 mtime 检测配置文件更改并自动重新初始化 MCP 工具
 
-        # Reload the configuration and update the global cache
+        # 重新加载配置并更新全局缓存
         reloaded_config = reload_extensions_config()
         return McpConfigResponse(mcp_servers={name: McpServerConfigResponse(**server.model_dump()) for name, server in reloaded_config.mcp_servers.items()})
 
     except Exception as e:
         logger.error(f"Failed to update MCP configuration: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to update MCP configuration: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"更新 MCP 配置失败: {str(e)}")

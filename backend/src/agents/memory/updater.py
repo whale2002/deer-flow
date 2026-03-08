@@ -1,4 +1,4 @@
-"""Memory updater for reading, writing, and updating memory data."""
+"""用于读取、写入和更新记忆数据的更新器。"""
 
 import json
 import re
@@ -17,14 +17,14 @@ from src.models import create_chat_model
 
 
 def _get_memory_file_path(agent_name: str | None = None) -> Path:
-    """Get the path to the memory file.
+    """获取记忆文件的路径。
 
     Args:
-        agent_name: If provided, returns the per-agent memory file path.
-                    If None, returns the global memory file path.
+        agent_name: 如果提供，则返回该 Agent 的记忆文件路径。
+                    如果为 None，则返回全局记忆文件路径。
 
     Returns:
-        Path to the memory file.
+        记忆文件的路径。
     """
     if agent_name is not None:
         return get_paths().agent_memory_file(agent_name)
@@ -32,13 +32,13 @@ def _get_memory_file_path(agent_name: str | None = None) -> Path:
     config = get_memory_config()
     if config.storage_path:
         p = Path(config.storage_path)
-        # Absolute path: use as-is; relative path: resolve against base_dir
+        # 绝对路径：原样使用；相对路径：基于 base_dir 解析
         return p if p.is_absolute() else get_paths().base_dir / p
     return get_paths().memory_file
 
 
 def _create_empty_memory() -> dict[str, Any]:
-    """Create an empty memory structure."""
+    """创建一个空的记忆结构（Schema）。"""
     return {
         "version": "1.0",
         "lastUpdated": datetime.utcnow().isoformat() + "Z",
@@ -56,26 +56,26 @@ def _create_empty_memory() -> dict[str, Any]:
     }
 
 
-# Per-agent memory cache: keyed by agent_name (None = global)
-# Value: (memory_data, file_mtime)
+# 每个 Agent 的记忆缓存：以 agent_name 为键（None 表示全局）
+# 值：(memory_data, file_mtime)
 _memory_cache: dict[str | None, tuple[dict[str, Any], float | None]] = {}
 
 
 def get_memory_data(agent_name: str | None = None) -> dict[str, Any]:
-    """Get the current memory data (cached with file modification time check).
+    """获取当前的记忆数据（带文件修改时间检查的缓存）。
 
-    The cache is automatically invalidated if the memory file has been modified
-    since the last load, ensuring fresh data is always returned.
+    如果记忆文件自上次加载以来已被修改，缓存会自动失效（Invalidate），
+    以确保始终返回最新数据（类似于 HTTP 协商缓存）。
 
     Args:
-        agent_name: If provided, loads per-agent memory. If None, loads global memory.
+        agent_name: 如果提供，加载该 Agent 的记忆。如果为 None，加载全局记忆。
 
     Returns:
-        The memory data dictionary.
+        记忆数据字典（Object）。
     """
     file_path = _get_memory_file_path(agent_name)
 
-    # Get current file modification time
+    # 获取当前文件修改时间
     try:
         current_mtime = file_path.stat().st_mtime if file_path.exists() else None
     except OSError:
@@ -83,7 +83,7 @@ def get_memory_data(agent_name: str | None = None) -> dict[str, Any]:
 
     cached = _memory_cache.get(agent_name)
 
-    # Invalidate cache if file has been modified or doesn't exist
+    # 如果文件已被修改或不存在，则使缓存失效
     if cached is None or cached[1] != current_mtime:
         memory_data = _load_memory_from_file(agent_name)
         _memory_cache[agent_name] = (memory_data, current_mtime)
@@ -93,13 +93,13 @@ def get_memory_data(agent_name: str | None = None) -> dict[str, Any]:
 
 
 def reload_memory_data(agent_name: str | None = None) -> dict[str, Any]:
-    """Reload memory data from file, forcing cache invalidation.
+    """从文件重新加载记忆数据，强制使缓存失效。
 
     Args:
-        agent_name: If provided, reloads per-agent memory. If None, reloads global memory.
+        agent_name: 如果提供，重新加载该 Agent 的记忆。如果为 None，重新加载全局记忆。
 
     Returns:
-        The reloaded memory data dictionary.
+        重新加载的记忆数据字典。
     """
     file_path = _get_memory_file_path(agent_name)
     memory_data = _load_memory_from_file(agent_name)
@@ -114,13 +114,13 @@ def reload_memory_data(agent_name: str | None = None) -> dict[str, Any]:
 
 
 def _load_memory_from_file(agent_name: str | None = None) -> dict[str, Any]:
-    """Load memory data from file.
+    """从文件加载记忆数据。
 
     Args:
-        agent_name: If provided, loads per-agent memory file. If None, loads global.
+        agent_name: 如果提供，加载该 Agent 的记忆文件。如果为 None，加载全局。
 
     Returns:
-        The memory data dictionary.
+        记忆数据字典。
     """
     file_path = _get_memory_file_path(agent_name)
 
@@ -136,9 +136,8 @@ def _load_memory_from_file(agent_name: str | None = None) -> dict[str, Any]:
         return _create_empty_memory()
 
 
-# Matches sentences that describe a file-upload *event* rather than general
-# file-related work.  Deliberately narrow to avoid removing legitimate facts
-# such as "User works with CSV files" or "prefers PDF export".
+# 匹配描述文件上传“事件”而非一般文件相关工作的句子。
+# 故意缩小范围以避免删除合法事实，例如“用户使用 CSV 文件”或“偏好 PDF 导出”。
 _UPLOAD_SENTENCE_RE = re.compile(
     r"[^.!?]*\b(?:"
     r"upload(?:ed|ing)?(?:\s+\w+){0,3}\s+(?:file|files?|document|documents?|attachment|attachments?)"
@@ -151,12 +150,12 @@ _UPLOAD_SENTENCE_RE = re.compile(
 
 
 def _strip_upload_mentions_from_memory(memory_data: dict[str, Any]) -> dict[str, Any]:
-    """Remove sentences about file uploads from all memory summaries and facts.
+    """从所有记忆摘要和事实中删除有关文件上传的句子。
 
-    Uploaded files are session-scoped; persisting upload events in long-term
-    memory causes the agent to search for non-existent files in future sessions.
+    上传的文件是会话范围（Session Scoped）的；将上传事件持久化到长期记忆中，
+    会导致 Agent 在未来的会话中搜索不存在的文件。
     """
-    # Scrub summaries in user/history sections
+    # 清理 user/history 部分的摘要
     for section in ("user", "history"):
         section_data = memory_data.get(section, {})
         for _key, val in section_data.items():
@@ -165,7 +164,7 @@ def _strip_upload_mentions_from_memory(memory_data: dict[str, Any]) -> dict[str,
                 cleaned = re.sub(r"  +", " ", cleaned)
                 val["summary"] = cleaned
 
-    # Also remove any facts that describe upload events
+    # 同时删除任何描述上传事件的事实
     facts = memory_data.get("facts", [])
     if facts:
         memory_data["facts"] = [f for f in facts if not _UPLOAD_SENTENCE_RE.search(f.get("content", ""))]
@@ -174,33 +173,33 @@ def _strip_upload_mentions_from_memory(memory_data: dict[str, Any]) -> dict[str,
 
 
 def _save_memory_to_file(memory_data: dict[str, Any], agent_name: str | None = None) -> bool:
-    """Save memory data to file and update cache.
+    """将记忆数据保存到文件并更新缓存。
 
     Args:
-        memory_data: The memory data to save.
-        agent_name: If provided, saves to per-agent memory file. If None, saves to global.
+        memory_data: 要保存的记忆数据。
+        agent_name: 如果提供，保存到该 Agent 的记忆文件。如果为 None，保存到全局。
 
     Returns:
-        True if successful, False otherwise.
+        成功返回 True，否则返回 False。
     """
     file_path = _get_memory_file_path(agent_name)
 
     try:
-        # Ensure directory exists
+        # 确保目录存在
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Update lastUpdated timestamp
+        # 更新 lastUpdated 时间戳
         memory_data["lastUpdated"] = datetime.utcnow().isoformat() + "Z"
 
-        # Write atomically using temp file
+        # 使用临时文件进行原子写入（Atomic Write）
         temp_path = file_path.with_suffix(".tmp")
         with open(temp_path, "w", encoding="utf-8") as f:
             json.dump(memory_data, f, indent=2, ensure_ascii=False)
 
-        # Rename temp file to actual file (atomic on most systems)
+        # 将临时文件重命名为实际文件（在大多数系统上是原子操作）
         temp_path.replace(file_path)
 
-        # Update cache and file modification time
+        # 更新缓存和文件修改时间
         try:
             mtime = file_path.stat().st_mtime
         except OSError:
@@ -216,32 +215,32 @@ def _save_memory_to_file(memory_data: dict[str, Any], agent_name: str | None = N
 
 
 class MemoryUpdater:
-    """Updates memory using LLM based on conversation context."""
+    """基于对话上下文使用 LLM 更新记忆。"""
 
     def __init__(self, model_name: str | None = None):
-        """Initialize the memory updater.
+        """初始化记忆更新器。
 
         Args:
-            model_name: Optional model name to use. If None, uses config or default.
+            model_name: 可选的模型名称。如果为 None，则使用配置或默认值。
         """
         self._model_name = model_name
 
     def _get_model(self):
-        """Get the model for memory updates."""
+        """获取用于记忆更新的模型。"""
         config = get_memory_config()
         model_name = self._model_name or config.model_name
         return create_chat_model(name=model_name, thinking_enabled=False)
 
     def update_memory(self, messages: list[Any], thread_id: str | None = None, agent_name: str | None = None) -> bool:
-        """Update memory based on conversation messages.
+        """基于对话消息更新记忆。
 
         Args:
-            messages: List of conversation messages.
-            thread_id: Optional thread ID for tracking source.
-            agent_name: If provided, updates per-agent memory. If None, updates global memory.
+            messages: 对话消息列表。
+            thread_id: 用于追踪来源的可选线程 ID。
+            agent_name: 如果提供，更新该 Agent 的记忆。如果为 None，更新全局记忆。
 
         Returns:
-            True if update was successful, False otherwise.
+            如果更新成功返回 True，否则返回 False。
         """
         config = get_memory_config()
         if not config.enabled:
@@ -251,44 +250,44 @@ class MemoryUpdater:
             return False
 
         try:
-            # Get current memory
+            # 获取当前记忆
             current_memory = get_memory_data(agent_name)
 
-            # Format conversation for prompt
+            # 格式化对话用于 Prompt
             conversation_text = format_conversation_for_update(messages)
 
             if not conversation_text.strip():
                 return False
 
-            # Build prompt
+            # 构建 Prompt
             prompt = MEMORY_UPDATE_PROMPT.format(
                 current_memory=json.dumps(current_memory, indent=2),
                 conversation=conversation_text,
             )
 
-            # Call LLM
+            # 调用 LLM
             model = self._get_model()
             response = model.invoke(prompt)
             response_text = str(response.content).strip()
 
-            # Parse response
-            # Remove markdown code blocks if present
+            # 解析响应
+            # 如果存在，移除 Markdown 代码块
             if response_text.startswith("```"):
                 lines = response_text.split("\n")
                 response_text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
 
             update_data = json.loads(response_text)
 
-            # Apply updates
+            # 应用更新
             updated_memory = self._apply_updates(current_memory, update_data, thread_id)
 
-            # Strip file-upload mentions from all summaries before saving.
-            # Uploaded files are session-scoped and won't exist in future sessions,
-            # so recording upload events in long-term memory causes the agent to
-            # try (and fail) to locate those files in subsequent conversations.
+            # 保存前从所有摘要中删除文件上传提及。
+            # 上传的文件是会话范围的，在未来的会话中将不存在，
+            # 因此在长期记忆中记录上传事件会导致 Agent 在后续对话中
+            # 尝试（并失败）定位这些文件。
             updated_memory = _strip_upload_mentions_from_memory(updated_memory)
 
-            # Save
+            # 保存
             return _save_memory_to_file(updated_memory, agent_name)
 
         except json.JSONDecodeError as e:
@@ -304,20 +303,20 @@ class MemoryUpdater:
         update_data: dict[str, Any],
         thread_id: str | None = None,
     ) -> dict[str, Any]:
-        """Apply LLM-generated updates to memory.
+        """将 LLM 生成的更新应用到记忆中（类似于 Redux Reducer）。
 
         Args:
-            current_memory: Current memory data.
-            update_data: Updates from LLM.
-            thread_id: Optional thread ID for tracking.
+            current_memory: 当前记忆数据。
+            update_data: 来自 LLM 的更新数据。
+            thread_id: 用于追踪的可选线程 ID。
 
         Returns:
-            Updated memory data.
+            更新后的记忆数据。
         """
         config = get_memory_config()
         now = datetime.utcnow().isoformat() + "Z"
 
-        # Update user sections
+        # 更新用户部分
         user_updates = update_data.get("user", {})
         for section in ["workContext", "personalContext", "topOfMind"]:
             section_data = user_updates.get(section, {})
@@ -327,7 +326,7 @@ class MemoryUpdater:
                     "updatedAt": now,
                 }
 
-        # Update history sections
+        # 更新历史部分
         history_updates = update_data.get("history", {})
         for section in ["recentMonths", "earlierContext", "longTermBackground"]:
             section_data = history_updates.get(section, {})
@@ -337,12 +336,12 @@ class MemoryUpdater:
                     "updatedAt": now,
                 }
 
-        # Remove facts
+        # 移除事实
         facts_to_remove = set(update_data.get("factsToRemove", []))
         if facts_to_remove:
             current_memory["facts"] = [f for f in current_memory.get("facts", []) if f.get("id") not in facts_to_remove]
 
-        # Add new facts
+        # 添加新事实
         new_facts = update_data.get("newFacts", [])
         for fact in new_facts:
             confidence = fact.get("confidence", 0.5)
@@ -357,9 +356,9 @@ class MemoryUpdater:
                 }
                 current_memory["facts"].append(fact_entry)
 
-        # Enforce max facts limit
+        # 强制执行最大事实数量限制
         if len(current_memory["facts"]) > config.max_facts:
-            # Sort by confidence and keep top ones
+            # 按置信度排序并保留排名靠前的
             current_memory["facts"] = sorted(
                 current_memory["facts"],
                 key=lambda f: f.get("confidence", 0),
@@ -370,15 +369,15 @@ class MemoryUpdater:
 
 
 def update_memory_from_conversation(messages: list[Any], thread_id: str | None = None, agent_name: str | None = None) -> bool:
-    """Convenience function to update memory from a conversation.
+    """从对话更新记忆的便捷函数（Helper Function）。
 
     Args:
-        messages: List of conversation messages.
-        thread_id: Optional thread ID.
-        agent_name: If provided, updates per-agent memory. If None, updates global memory.
+        messages: 对话消息列表。
+        thread_id: 可选线程 ID。
+        agent_name: 如果提供，更新该 Agent 的记忆。如果为 None，更新全局记忆。
 
     Returns:
-        True if successful, False otherwise.
+        如果成功返回 True，否则返回 False。
     """
     updater = MemoryUpdater()
     return updater.update_memory(messages, thread_id, agent_name)

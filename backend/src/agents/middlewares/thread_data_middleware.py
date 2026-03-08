@@ -9,47 +9,47 @@ from src.config.paths import Paths, get_paths
 
 
 class ThreadDataMiddlewareState(AgentState):
-    """Compatible with the `ThreadState` schema."""
+    """与 `ThreadState` Schema 兼容的状态。"""
 
     thread_data: NotRequired[ThreadDataState | None]
 
 
 class ThreadDataMiddleware(AgentMiddleware[ThreadDataMiddlewareState]):
-    """Create thread data directories for each thread execution.
+    """为每个线程执行创建线程数据目录。
 
-    Creates the following directory structure:
+    创建以下目录结构：
     - {base_dir}/threads/{thread_id}/user-data/workspace
     - {base_dir}/threads/{thread_id}/user-data/uploads
     - {base_dir}/threads/{thread_id}/user-data/outputs
 
-    Lifecycle Management:
-    - With lazy_init=True (default): Only compute paths, directories created on-demand
-    - With lazy_init=False: Eagerly create directories in before_agent()
+    生命周期管理：
+    - lazy_init=True（默认）：仅计算路径，目录按需创建
+    - lazy_init=False：在 before_agent() 中急切创建（Eagerly Create）目录
     """
 
     state_schema = ThreadDataMiddlewareState
 
     def __init__(self, base_dir: str | None = None, lazy_init: bool = True):
-        """Initialize the middleware.
+        """初始化中间件。
 
         Args:
-            base_dir: Base directory for thread data. Defaults to Paths resolution.
-            lazy_init: If True, defer directory creation until needed.
-                      If False, create directories eagerly in before_agent().
-                      Default is True for optimal performance.
+            base_dir: 线程数据的基础目录。默认为 Paths 解析。
+            lazy_init: 如果为 True，推迟创建目录直到需要时。
+                      如果为 False，在 before_agent() 中急切创建目录。
+                      默认为 True 以获得最佳性能。
         """
         super().__init__()
         self._paths = Paths(base_dir) if base_dir else get_paths()
         self._lazy_init = lazy_init
 
     def _get_thread_paths(self, thread_id: str) -> dict[str, str]:
-        """Get the paths for a thread's data directories.
+        """获取线程数据目录的路径。
 
         Args:
-            thread_id: The thread ID.
+            thread_id: 线程 ID。
 
         Returns:
-            Dictionary with workspace_path, uploads_path, and outputs_path.
+            包含 workspace_path, uploads_path 和 outputs_path 的字典。
         """
         return {
             "workspace_path": str(self._paths.sandbox_work_dir(thread_id)),
@@ -58,13 +58,13 @@ class ThreadDataMiddleware(AgentMiddleware[ThreadDataMiddlewareState]):
         }
 
     def _create_thread_directories(self, thread_id: str) -> dict[str, str]:
-        """Create the thread data directories.
+        """创建线程数据目录。
 
         Args:
-            thread_id: The thread ID.
+            thread_id: 线程 ID。
 
         Returns:
-            Dictionary with the created directory paths.
+            包含已创建目录路径的字典。
         """
         self._paths.ensure_thread_dirs(thread_id)
         return self._get_thread_paths(thread_id)
@@ -73,13 +73,13 @@ class ThreadDataMiddleware(AgentMiddleware[ThreadDataMiddlewareState]):
     def before_agent(self, state: ThreadDataMiddlewareState, runtime: Runtime) -> dict | None:
         thread_id = runtime.context.get("thread_id")
         if thread_id is None:
-            raise ValueError("Thread ID is required in the context")
+            raise ValueError("Context 中必须包含 Thread ID")
 
         if self._lazy_init:
-            # Lazy initialization: only compute paths, don't create directories
+            # 懒加载：仅计算路径，不创建目录
             paths = self._get_thread_paths(thread_id)
         else:
-            # Eager initialization: create directories immediately
+            # 急切加载：立即创建目录
             paths = self._create_thread_directories(thread_id)
             print(f"Created thread data directories for thread {thread_id}")
 

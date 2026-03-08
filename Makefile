@@ -1,6 +1,6 @@
 # DeerFlow - Unified Development Environment
 
-.PHONY: help config check install dev stop clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway
+.PHONY: help config check install dev stop clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway frontend backend gateway langgraph nginx
 
 help:
 	@echo "DeerFlow Development Commands:"
@@ -243,6 +243,38 @@ dev:
 	echo "Press Ctrl+C to stop all services"; \
 	echo ""; \
 	wait
+
+# Start only Frontend
+frontend:
+	@echo "Starting Frontend..."
+	@cd frontend && pnpm run dev
+
+# Start only Gateway
+gateway:
+	@echo "Starting Gateway API..."
+	@cd backend && uv run uvicorn src.gateway.app:app --host 0.0.0.0 --port 8001 --reload
+
+# Start only LangGraph
+langgraph:
+	@echo "Starting LangGraph server..."
+	@cd backend && NO_COLOR=1 uv run langgraph dev --no-browser --allow-blocking --no-reload
+
+# Start Backend (Gateway + LangGraph)
+backend:
+	@echo "Starting Backend Services..."
+	@mkdir -p logs
+	@trap 'pkill -f "langgraph dev"; exit' INT TERM; \
+	echo "Starting LangGraph in background (logs/langgraph.log)..."; \
+	cd backend && NO_COLOR=1 uv run langgraph dev --no-browser --allow-blocking --no-reload > ../logs/langgraph.log 2>&1 & \
+	sleep 2; \
+	echo "Starting Gateway in foreground..."; \
+	cd backend && uv run uvicorn src.gateway.app:app --host 0.0.0.0 --port 8001 --reload
+
+# Start only Nginx
+nginx:
+	@echo "Starting Nginx reverse proxy on localhost:2026..."
+	@mkdir -p logs
+	@nginx -g 'daemon off;' -c $(PWD)/docker/nginx/nginx.local.conf -p $(PWD)
 
 # Stop all services
 stop:

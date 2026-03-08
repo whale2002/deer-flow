@@ -1,18 +1,17 @@
-"""Sync checkpointer factory.
+"""同步检查点工厂 (Sync Checkpointer Factory)。
 
-Provides a **sync singleton** and a **sync context manager** for LangGraph
-graph compilation and CLI tools.
+为 LangGraph 图编译和 CLI 工具提供 **同步单例** 和 **同步上下文管理器**。
 
-Supported backends: memory, sqlite, postgres.
+支持的后端：memory (内存), sqlite, postgres。
 
-Usage::
+用法::
 
     from src.agents.checkpointer.provider import get_checkpointer, checkpointer_context
 
-    # Singleton — reused across calls, closed on process exit
+    # 单例 (Singleton) — 跨调用重用，进程退出时关闭
     cp = get_checkpointer()
 
-    # One-shot — fresh connection, closed on block exit
+    # 一次性 (One-shot) — 新连接，块退出时关闭
     with checkpointer_context() as cp:
         graph.invoke(input, config={"configurable": {"thread_id": "1"}})
 """
@@ -32,7 +31,7 @@ from src.config.paths import resolve_path
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Error message constants — imported by aio.provider too
+# 错误消息常量 — 也被 aio.provider 导入使用
 # ---------------------------------------------------------------------------
 
 SQLITE_INSTALL = "langgraph-checkpoint-sqlite is required for the SQLite checkpointer. Install it with: uv add langgraph-checkpoint-sqlite"
@@ -40,16 +39,15 @@ POSTGRES_INSTALL = "langgraph-checkpoint-postgres is required for the PostgreSQL
 POSTGRES_CONN_REQUIRED = "checkpointer.connection_string is required for the postgres backend"
 
 # ---------------------------------------------------------------------------
-# Sync factory
+# 同步工厂 (Sync factory)
 # ---------------------------------------------------------------------------
 
 
 def _resolve_sqlite_conn_str(raw: str) -> str:
-    """Return a SQLite connection string ready for use with ``SqliteSaver``.
+    """返回可供 ``SqliteSaver`` 使用的 SQLite 连接字符串。
 
-    SQLite special strings (``":memory:"`` and ``file:`` URIs) are returned
-    unchanged.  Plain filesystem paths — relative or absolute — are resolved
-    to an absolute string via :func:`resolve_path`.
+    SQLite 特殊字符串 (``":memory:"`` 和 ``file:`` URIs) 保持不变。
+    普通文件系统路径 — 相对或绝对 — 通过 :func:`resolve_path` 解析为绝对字符串。
     """
     if raw == ":memory:" or raw.startswith("file:"):
         return raw
@@ -58,12 +56,11 @@ def _resolve_sqlite_conn_str(raw: str) -> str:
 
 @contextlib.contextmanager
 def _sync_checkpointer_cm(config: CheckpointerConfig) -> Iterator[Checkpointer]:
-    """Context manager that creates and tears down a sync checkpointer.
+    """创建和拆除同步检查点保存器的上下文管理器。
 
-    Returns a configured ``Checkpointer`` instance. Resource cleanup for any
-    underlying connections or pools is handled by higher-level helpers in
-    this module (such as the singleton factory or context manager); this
-    function does not return a separate cleanup callback.
+    返回配置好的 ``Checkpointer`` 实例。底层连接或池的资源清理
+    由本模块中的更高级别帮助程序（如单例工厂或上下文管理器）处理；
+    此函数不返回单独的清理回调。
     """
     if config.type == "memory":
         from langgraph.checkpoint.memory import InMemorySaver
@@ -100,25 +97,25 @@ def _sync_checkpointer_cm(config: CheckpointerConfig) -> Iterator[Checkpointer]:
             yield saver
         return
 
-    raise ValueError(f"Unknown checkpointer type: {config.type!r}")
+    raise ValueError(f"未知的检查点类型: {config.type!r}")
 
 
 # ---------------------------------------------------------------------------
-# Sync singleton
+# 同步单例 (Sync singleton)
 # ---------------------------------------------------------------------------
 
 _checkpointer: Checkpointer = None
-_checkpointer_ctx = None  # open context manager keeping the connection alive
+_checkpointer_ctx = None  # 保持连接活跃的打开的上下文管理器
 
 
 def get_checkpointer() -> Checkpointer | None:
-    """Return the global sync checkpointer singleton, creating it on first call.
+    """返回全局同步检查点单例，在首次调用时创建。
 
-    Returns ``None`` when no checkpointer is configured in *config.yaml*.
+    当 *config.yaml* 中未配置检查点保存器时返回 ``None``。
 
     Raises:
-        ImportError: If the required package for the configured backend is not installed.
-        ValueError: If ``connection_string`` is missing for a backend that requires it.
+        ImportError: 如果未安装配置的后端所需的包。
+        ValueError: 如果需要连接字符串的后端缺少 ``connection_string``。
     """
     global _checkpointer, _checkpointer_ctx
 
@@ -138,10 +135,10 @@ def get_checkpointer() -> Checkpointer | None:
 
 
 def reset_checkpointer() -> None:
-    """Reset the sync singleton, forcing recreation on the next call.
+    """重置同步单例，强制在下次调用时重新创建。
 
-    Closes any open backend connections and clears the cached instance.
-    Useful in tests or after a configuration change.
+    关闭任何打开的后端连接并清除缓存的实例。
+    在测试或配置更改后很有用。
     """
     global _checkpointer, _checkpointer_ctx
     if _checkpointer_ctx is not None:
@@ -154,17 +151,17 @@ def reset_checkpointer() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Sync context manager
+# 同步上下文管理器 (Sync context manager)
 # ---------------------------------------------------------------------------
 
 
 @contextlib.contextmanager
 def checkpointer_context() -> Iterator[Checkpointer | None]:
-    """Sync context manager that yields a checkpointer and cleans up on exit.
+    """Yield 检查点保存器并在退出时清理的同步上下文管理器。
 
-    Unlike :func:`get_checkpointer`, this does **not** cache the instance —
-    each ``with`` block creates and destroys its own connection.  Use it in
-    CLI scripts or tests where you want deterministic cleanup::
+    与 :func:`get_checkpointer` 不同，此函数 **不** 缓存实例 —
+    每个 ``with`` 块都会创建并销毁自己的连接。在 CLI 脚本或测试中
+    如果需要确定性清理，请使用此方法::
 
         with checkpointer_context() as cp:
             graph.invoke(input, config={"configurable": {"thread_id": "1"}})

@@ -9,7 +9,7 @@ _config_lock = threading.Lock()
 
 
 class TracingConfig(BaseModel):
-    """Configuration for LangSmith tracing."""
+    """LangSmith 追踪配置。"""
 
     enabled: bool = Field(...)
     api_key: str | None = Field(...)
@@ -18,7 +18,7 @@ class TracingConfig(BaseModel):
 
     @property
     def is_configured(self) -> bool:
-        """Check if tracing is fully configured (enabled and has API key)."""
+        """检查追踪是否已完全配置（已启用且具有 API 密钥）。"""
         return self.enabled and bool(self.api_key)
 
 
@@ -26,15 +26,15 @@ _tracing_config: TracingConfig | None = None
 
 
 def get_tracing_config() -> TracingConfig:
-    """Get the current tracing configuration from environment variables.
+    """从环境变量获取当前追踪配置。
     Returns:
-        TracingConfig with current settings.
+        包含当前设置的 TracingConfig。
     """
     global _tracing_config
     if _tracing_config is not None:
         return _tracing_config
     with _config_lock:
-        if _tracing_config is not None:  # Double-check after acquiring lock
+        if _tracing_config is not None:  # 获取锁后再次检查
             return _tracing_config
         _tracing_config = TracingConfig(
             enabled=os.environ.get("LANGSMITH_TRACING", "").lower() == "true",
@@ -46,8 +46,8 @@ def get_tracing_config() -> TracingConfig:
 
 
 def is_tracing_enabled() -> bool:
-    """Check if LangSmith tracing is enabled and configured.
+    """检查 LangSmith 追踪是否已启用并配置。
     Returns:
-        True if tracing is enabled and has an API key.
+        如果追踪已启用且具有 API 密钥，则返回 True。
     """
     return get_tracing_config().is_configured

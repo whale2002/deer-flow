@@ -1,3 +1,5 @@
+"""技能路由器。"""
+
 import json
 import logging
 import re
@@ -20,121 +22,121 @@ router = APIRouter(prefix="/api", tags=["skills"])
 
 
 class SkillResponse(BaseModel):
-    """Response model for skill information."""
+    """技能信息的响应模型。"""
 
-    name: str = Field(..., description="Name of the skill")
-    description: str = Field(..., description="Description of what the skill does")
-    license: str | None = Field(None, description="License information")
-    category: str = Field(..., description="Category of the skill (public or custom)")
-    enabled: bool = Field(default=True, description="Whether this skill is enabled")
+    name: str = Field(..., description="技能名称")
+    description: str = Field(..., description="技能功能描述")
+    license: str | None = Field(None, description="许可信息")
+    category: str = Field(..., description="技能类别（public 或 custom）")
+    enabled: bool = Field(default=True, description="此技能是否已启用")
 
 
 class SkillsListResponse(BaseModel):
-    """Response model for listing all skills."""
+    """列出所有技能的响应模型。"""
 
     skills: list[SkillResponse]
 
 
 class SkillUpdateRequest(BaseModel):
-    """Request model for updating a skill."""
+    """更新技能的请求模型。"""
 
-    enabled: bool = Field(..., description="Whether to enable or disable the skill")
+    enabled: bool = Field(..., description="是否启用或禁用该技能")
 
 
 class SkillInstallRequest(BaseModel):
-    """Request model for installing a skill from a .skill file."""
+    """从 .skill 文件安装技能的请求模型。"""
 
-    thread_id: str = Field(..., description="The thread ID where the .skill file is located")
-    path: str = Field(..., description="Virtual path to the .skill file (e.g., mnt/user-data/outputs/my-skill.skill)")
+    thread_id: str = Field(..., description="所在的线程 ID")
+    path: str = Field(..., description=".skill 文件的虚拟路径（例如 mnt/user-data/outputs/my-skill.skill）")
 
 
 class SkillInstallResponse(BaseModel):
-    """Response model for skill installation."""
+    """技能安装的响应模型。"""
 
-    success: bool = Field(..., description="Whether the installation was successful")
-    skill_name: str = Field(..., description="Name of the installed skill")
-    message: str = Field(..., description="Installation result message")
+    success: bool = Field(..., description="安装是否成功")
+    skill_name: str = Field(..., description="已安装的技能名称")
+    message: str = Field(..., description="安装结果消息")
 
 
-# Allowed properties in SKILL.md frontmatter
+# SKILL.md frontmatter 中允许的属性
 ALLOWED_FRONTMATTER_PROPERTIES = {"name", "description", "license", "allowed-tools", "metadata"}
 
 
 def _validate_skill_frontmatter(skill_dir: Path) -> tuple[bool, str, str | None]:
-    """Validate a skill directory's SKILL.md frontmatter.
+    """验证技能目录中的 SKILL.md frontmatter。
 
     Args:
-        skill_dir: Path to the skill directory containing SKILL.md.
+        skill_dir: 包含 SKILL.md 的技能目录路径。
 
     Returns:
-        Tuple of (is_valid, message, skill_name).
+        包含 (is_valid, message, skill_name) 的元组。
     """
     skill_md = skill_dir / "SKILL.md"
     if not skill_md.exists():
-        return False, "SKILL.md not found", None
+        return False, "未找到 SKILL.md", None
 
     content = skill_md.read_text()
     if not content.startswith("---"):
-        return False, "No YAML frontmatter found", None
+        return False, "未找到 YAML frontmatter", None
 
-    # Extract frontmatter
+    # 提取 frontmatter
     match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
     if not match:
-        return False, "Invalid frontmatter format", None
+        return False, "无效的 frontmatter 格式", None
 
     frontmatter_text = match.group(1)
 
-    # Parse YAML frontmatter
+    # 解析 YAML frontmatter
     try:
         frontmatter = yaml.safe_load(frontmatter_text)
         if not isinstance(frontmatter, dict):
-            return False, "Frontmatter must be a YAML dictionary", None
+            return False, "Frontmatter 必须是 YAML 字典", None
     except yaml.YAMLError as e:
-        return False, f"Invalid YAML in frontmatter: {e}", None
+        return False, f"Frontmatter 中存在无效的 YAML: {e}", None
 
-    # Check for unexpected properties
+    # 检查意外属性
     unexpected_keys = set(frontmatter.keys()) - ALLOWED_FRONTMATTER_PROPERTIES
     if unexpected_keys:
-        return False, f"Unexpected key(s) in SKILL.md frontmatter: {', '.join(sorted(unexpected_keys))}", None
+        return False, f"SKILL.md frontmatter 中存在意外的键: {', '.join(sorted(unexpected_keys))}", None
 
-    # Check required fields
+    # 检查必需字段
     if "name" not in frontmatter:
-        return False, "Missing 'name' in frontmatter", None
+        return False, "frontmatter 中缺少 'name'", None
     if "description" not in frontmatter:
-        return False, "Missing 'description' in frontmatter", None
+        return False, "frontmatter 中缺少 'description'", None
 
-    # Validate name
+    # 验证名称
     name = frontmatter.get("name", "")
     if not isinstance(name, str):
-        return False, f"Name must be a string, got {type(name).__name__}", None
+        return False, f"名称必须是字符串，得到的是 {type(name).__name__}", None
     name = name.strip()
     if not name:
-        return False, "Name cannot be empty", None
+        return False, "名称不能为空", None
 
-    # Check naming convention (hyphen-case: lowercase with hyphens)
+    # 检查命名约定（连字符命名法：仅小写字母、数字和连字符）
     if not re.match(r"^[a-z0-9-]+$", name):
-        return False, f"Name '{name}' should be hyphen-case (lowercase letters, digits, and hyphens only)", None
+        return False, f"名称 '{name}' 应为连字符命名法（仅小写字母、数字和连字符）", None
     if name.startswith("-") or name.endswith("-") or "--" in name:
-        return False, f"Name '{name}' cannot start/end with hyphen or contain consecutive hyphens", None
+        return False, f"名称 '{name}' 不能以连字符开头/结尾或包含连续连字符", None
     if len(name) > 64:
-        return False, f"Name is too long ({len(name)} characters). Maximum is 64 characters.", None
+        return False, f"名称太长（{len(name)} 个字符）。最大为 64 个字符。", None
 
-    # Validate description
+    # 验证描述
     description = frontmatter.get("description", "")
     if not isinstance(description, str):
-        return False, f"Description must be a string, got {type(description).__name__}", None
+        return False, f"描述必须是字符串，得到的是 {type(description).__name__}", None
     description = description.strip()
     if description:
         if "<" in description or ">" in description:
-            return False, "Description cannot contain angle brackets (< or >)", None
+            return False, "描述不能包含尖括号（< 或 >）", None
         if len(description) > 1024:
-            return False, f"Description is too long ({len(description)} characters). Maximum is 1024 characters.", None
+            return False, f"描述太长（{len(description)} 个字符）。最大为 1024 个字符。", None
 
-    return True, "Skill is valid!", name
+    return True, "技能有效！", name
 
 
 def _skill_to_response(skill: Skill) -> SkillResponse:
-    """Convert a Skill object to a SkillResponse."""
+    """将 Skill 对象转换为 SkillResponse。"""
     return SkillResponse(
         name=skill.name,
         description=skill.description,
@@ -147,16 +149,16 @@ def _skill_to_response(skill: Skill) -> SkillResponse:
 @router.get(
     "/skills",
     response_model=SkillsListResponse,
-    summary="List All Skills",
-    description="Retrieve a list of all available skills from both public and custom directories.",
+    summary="列出所有技能",
+    description="检索所有可用技能的列表（包括 public 和 custom 目录）。",
 )
 async def list_skills() -> SkillsListResponse:
-    """List all available skills.
+    """列出所有可用技能。
 
-    Returns all skills regardless of their enabled status.
+    无论启用状态如何，都返回所有技能。
 
     Returns:
-        A list of all skills with their metadata.
+        包含元数据的所有技能列表。
 
     Example Response:
         ```json
@@ -181,7 +183,7 @@ async def list_skills() -> SkillsListResponse:
         ```
     """
     try:
-        # Load all skills (including disabled ones)
+        # 加载所有技能（包括禁用的）
         skills = load_skills(enabled_only=False)
         return SkillsListResponse(skills=[_skill_to_response(skill) for skill in skills])
     except Exception as e:
@@ -192,20 +194,20 @@ async def list_skills() -> SkillsListResponse:
 @router.get(
     "/skills/{skill_name}",
     response_model=SkillResponse,
-    summary="Get Skill Details",
-    description="Retrieve detailed information about a specific skill by its name.",
+    summary="获取技能详情",
+    description="通过名称检索特定技能的详细信息。",
 )
 async def get_skill(skill_name: str) -> SkillResponse:
-    """Get a specific skill by name.
+    """按名称获取特定技能。
 
     Args:
-        skill_name: The name of the skill to retrieve.
+        skill_name: 要检索的技能名称。
 
     Returns:
-        Skill information if found.
+        如果找到则返回技能信息。
 
     Raises:
-        HTTPException: 404 if skill not found.
+        HTTPException: 如果未找到技能则返回 404。
 
     Example Response:
         ```json
@@ -236,24 +238,24 @@ async def get_skill(skill_name: str) -> SkillResponse:
 @router.put(
     "/skills/{skill_name}",
     response_model=SkillResponse,
-    summary="Update Skill",
-    description="Update a skill's enabled status by modifying the skills_state_config.json file.",
+    summary="更新技能",
+    description="通过修改 skills_state_config.json 文件来更新技能的启用状态。",
 )
 async def update_skill(skill_name: str, request: SkillUpdateRequest) -> SkillResponse:
-    """Update a skill's enabled status.
+    """更新技能的启用状态。
 
-    This will modify the skills_state_config.json file to update the enabled state.
-    The SKILL.md file itself is not modified.
+    这将修改 skills_state_config.json 文件以更新启用状态。
+    SKILL.md 文件本身不会被修改。
 
     Args:
-        skill_name: The name of the skill to update.
-        request: The update request containing the new enabled status.
+        skill_name: 要更新的技能名称。
+        request: 包含新启用状态的更新请求。
 
     Returns:
-        The updated skill information.
+        更新后的技能信息。
 
     Raises:
-        HTTPException: 404 if skill not found, 500 if update fails.
+        HTTPException: 如果未找到技能则返回 404，如果更新失败则返回 500。
 
     Example Request:
         ```json
@@ -274,42 +276,42 @@ async def update_skill(skill_name: str, request: SkillUpdateRequest) -> SkillRes
         ```
     """
     try:
-        # Find the skill to verify it exists
+        # 查找技能以验证其是否存在
         skills = load_skills(enabled_only=False)
         skill = next((s for s in skills if s.name == skill_name), None)
 
         if skill is None:
             raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' not found")
 
-        # Get or create config path
+        # 获取或创建配置路径
         config_path = ExtensionsConfig.resolve_config_path()
         if config_path is None:
-            # Create new config file in parent directory (project root)
+            # 在父目录（项目根目录）中创建新配置文件
             config_path = Path.cwd().parent / "extensions_config.json"
             logger.info(f"No existing extensions config found. Creating new config at: {config_path}")
 
-        # Load current configuration
+        # 加载当前配置
         extensions_config = get_extensions_config()
 
-        # Update the skill's enabled status
+        # 更新技能的启用状态
         extensions_config.skills[skill_name] = SkillStateConfig(enabled=request.enabled)
 
-        # Convert to JSON format (preserve MCP servers config)
+        # 转换为 JSON 格式（保留 MCP 服务器配置）
         config_data = {
             "mcpServers": {name: server.model_dump() for name, server in extensions_config.mcp_servers.items()},
             "skills": {name: {"enabled": skill_config.enabled} for name, skill_config in extensions_config.skills.items()},
         }
 
-        # Write the configuration to file
+        # 将配置写入文件
         with open(config_path, "w") as f:
             json.dump(config_data, f, indent=2)
 
         logger.info(f"Skills configuration updated and saved to: {config_path}")
 
-        # Reload the extensions config to update the global cache
+        # 重新加载扩展配置以更新全局缓存
         reload_extensions_config()
 
-        # Reload the skills to get the updated status (for API response)
+        # 重新加载技能以获取更新后的状态（用于 API 响应）
         skills = load_skills(enabled_only=False)
         updated_skill = next((s for s in skills if s.name == skill_name), None)
 
@@ -329,28 +331,28 @@ async def update_skill(skill_name: str, request: SkillUpdateRequest) -> SkillRes
 @router.post(
     "/skills/install",
     response_model=SkillInstallResponse,
-    summary="Install Skill",
-    description="Install a skill from a .skill file (ZIP archive) located in the thread's user-data directory.",
+    summary="安装技能",
+    description="从位于线程 user-data 目录中的 .skill 文件（ZIP 归档）安装技能。",
 )
 async def install_skill(request: SkillInstallRequest) -> SkillInstallResponse:
-    """Install a skill from a .skill file.
+    """从 .skill 文件安装技能。
 
-    The .skill file is a ZIP archive containing a skill directory with SKILL.md
-    and optional resources (scripts, references, assets).
+    .skill 文件是一个 ZIP 归档，包含一个带有 SKILL.md 的技能目录，
+    以及可选的资源（脚本、引用、资产）。
 
     Args:
-        request: The install request containing thread_id and virtual path to .skill file.
+        request: 包含 thread_id 和 .skill 文件虚拟路径的安装请求。
 
     Returns:
-        Installation result with skill name and status message.
+        包含技能名称和状态消息的安装结果。
 
     Raises:
         HTTPException:
-            - 400 if path is invalid or file is not a valid .skill file
-            - 403 if access denied (path traversal detected)
-            - 404 if file not found
-            - 409 if skill already exists
-            - 500 if installation fails
+            - 400 如果路径无效或文件不是有效的 .skill 文件
+            - 403 如果访问被拒绝（检测到路径遍历）
+            - 404 如果文件未找到
+            - 409 如果技能已存在
+            - 500 如果安装失败
 
     Example Request:
         ```json
@@ -370,53 +372,53 @@ async def install_skill(request: SkillInstallRequest) -> SkillInstallResponse:
         ```
     """
     try:
-        # Resolve the virtual path to actual file path
+        # 将虚拟路径解析为实际文件路径
         skill_file_path = resolve_thread_virtual_path(request.thread_id, request.path)
 
-        # Check if file exists
+        # 检查文件是否存在
         if not skill_file_path.exists():
             raise HTTPException(status_code=404, detail=f"Skill file not found: {request.path}")
 
-        # Check if it's a file
+        # 检查是否为文件
         if not skill_file_path.is_file():
             raise HTTPException(status_code=400, detail=f"Path is not a file: {request.path}")
 
-        # Check file extension
+        # 检查文件扩展名
         if not skill_file_path.suffix == ".skill":
             raise HTTPException(status_code=400, detail="File must have .skill extension")
 
-        # Verify it's a valid ZIP file
+        # 验证是否为有效的 ZIP 文件
         if not zipfile.is_zipfile(skill_file_path):
             raise HTTPException(status_code=400, detail="File is not a valid ZIP archive")
 
-        # Get the custom skills directory
+        # 获取自定义技能目录
         skills_root = get_skills_root_path()
         custom_skills_dir = skills_root / "custom"
 
-        # Create custom directory if it doesn't exist
+        # 如果不存在则创建自定义目录
         custom_skills_dir.mkdir(parents=True, exist_ok=True)
 
-        # Extract to a temporary directory first for validation
+        # 先解压到临时目录进行验证
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Extract the .skill file
+            # 解压 .skill 文件
             with zipfile.ZipFile(skill_file_path, "r") as zip_ref:
                 zip_ref.extractall(temp_path)
 
-            # Find the skill directory (should be the only top-level directory)
+            # 查找技能目录（应该是唯一的顶级目录）
             extracted_items = list(temp_path.iterdir())
             if len(extracted_items) == 0:
                 raise HTTPException(status_code=400, detail="Skill archive is empty")
 
-            # Handle both cases: single directory or files directly in root
+            # 处理两种情况：单个目录或文件直接在根目录
             if len(extracted_items) == 1 and extracted_items[0].is_dir():
                 skill_dir = extracted_items[0]
             else:
-                # Files are directly in the archive root
+                # 文件直接在归档根目录
                 skill_dir = temp_path
 
-            # Validate the skill
+            # 验证技能
             is_valid, message, skill_name = _validate_skill_frontmatter(skill_dir)
             if not is_valid:
                 raise HTTPException(status_code=400, detail=f"Invalid skill: {message}")
@@ -424,12 +426,12 @@ async def install_skill(request: SkillInstallRequest) -> SkillInstallResponse:
             if not skill_name:
                 raise HTTPException(status_code=400, detail="Could not determine skill name")
 
-            # Check if skill already exists
+            # 检查技能是否已存在
             target_dir = custom_skills_dir / skill_name
             if target_dir.exists():
                 raise HTTPException(status_code=409, detail=f"Skill '{skill_name}' already exists. Please remove it first or use a different name.")
 
-            # Move the skill directory to the custom skills directory
+            # 将技能目录移动到自定义技能目录
             shutil.copytree(skill_dir, target_dir)
 
         logger.info(f"Skill '{skill_name}' installed successfully to {target_dir}")

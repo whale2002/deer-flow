@@ -1,4 +1,4 @@
-"""CRUD API for custom agents."""
+"""自定义 Agent 的增删改查 API。"""
 
 import logging
 import re
@@ -14,67 +14,68 @@ from src.config.paths import get_paths
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["agents"])
 
+# Agent 名称的正则表达式：仅允许字母、数字和连字符
 AGENT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9-]+$")
 
 
 class AgentResponse(BaseModel):
-    """Response model for a custom agent."""
+    """自定义 Agent 的响应模型 (DTO)。"""
 
-    name: str = Field(..., description="Agent name (hyphen-case)")
-    description: str = Field(default="", description="Agent description")
-    model: str | None = Field(default=None, description="Optional model override")
-    tool_groups: list[str] | None = Field(default=None, description="Optional tool group whitelist")
-    soul: str | None = Field(default=None, description="SOUL.md content (included on GET /{name})")
+    name: str = Field(..., description="Agent 名称 (连字符命名法)")
+    description: str = Field(default="", description="Agent 描述")
+    model: str | None = Field(default=None, description="可选的模型覆盖配置")
+    tool_groups: list[str] | None = Field(default=None, description="可选的工具组白名单")
+    soul: str | None = Field(default=None, description="SOUL.md 内容 (在 GET /{name} 时包含)")
 
 
 class AgentsListResponse(BaseModel):
-    """Response model for listing all custom agents."""
+    """列出所有自定义 Agent 的响应模型。"""
 
     agents: list[AgentResponse]
 
 
 class AgentCreateRequest(BaseModel):
-    """Request body for creating a custom agent."""
+    """创建自定义 Agent 的请求体。"""
 
-    name: str = Field(..., description="Agent name (must match ^[A-Za-z0-9-]+$, stored as lowercase)")
-    description: str = Field(default="", description="Agent description")
-    model: str | None = Field(default=None, description="Optional model override")
-    tool_groups: list[str] | None = Field(default=None, description="Optional tool group whitelist")
-    soul: str = Field(default="", description="SOUL.md content — agent personality and behavioral guardrails")
+    name: str = Field(..., description="Agent 名称 (必须匹配 ^[A-Za-z0-9-]+$，存储时会转为小写)")
+    description: str = Field(default="", description="Agent 描述")
+    model: str | None = Field(default=None, description="可选的模型覆盖配置")
+    tool_groups: list[str] | None = Field(default=None, description="可选的工具组白名单")
+    soul: str = Field(default="", description="SOUL.md 内容 — 定义 Agent 的人设和行为准则")
 
 
 class AgentUpdateRequest(BaseModel):
-    """Request body for updating a custom agent."""
+    """更新自定义 Agent 的请求体。"""
 
-    description: str | None = Field(default=None, description="Updated description")
-    model: str | None = Field(default=None, description="Updated model override")
-    tool_groups: list[str] | None = Field(default=None, description="Updated tool group whitelist")
-    soul: str | None = Field(default=None, description="Updated SOUL.md content")
+    description: str | None = Field(default=None, description="更新后的描述")
+    model: str | None = Field(default=None, description="更新后的模型覆盖配置")
+    tool_groups: list[str] | None = Field(default=None, description="更新后的工具组白名单")
+    soul: str | None = Field(default=None, description="更新后的 SOUL.md 内容")
 
 
 def _validate_agent_name(name: str) -> None:
-    """Validate agent name against allowed pattern.
+    """验证 Agent 名称是否符合规则。
 
     Args:
-        name: The agent name to validate.
+        name: 待验证的 Agent 名称。
 
     Raises:
-        HTTPException: 422 if the name is invalid.
+        HTTPException: 如果名称无效，返回 422 错误。
     """
     if not AGENT_NAME_PATTERN.match(name):
         raise HTTPException(
             status_code=422,
-            detail=f"Invalid agent name '{name}'. Must match ^[A-Za-z0-9-]+$ (letters, digits, and hyphens only).",
+            detail=f"Agent 名称 '{name}' 无效。必须匹配 ^[A-Za-z0-9-]+$ (仅限字母、数字和连字符)。",
         )
 
 
 def _normalize_agent_name(name: str) -> str:
-    """Normalize agent name to lowercase for filesystem storage."""
+    """将 Agent 名称标准化为小写，以便在文件系统中存储。"""
     return name.lower()
 
 
 def _agent_config_to_response(agent_cfg: AgentConfig, include_soul: bool = False) -> AgentResponse:
-    """Convert AgentConfig to AgentResponse."""
+    """将 AgentConfig 对象转换为 AgentResponse 对象 (DTO 转换)。"""
     soul: str | None = None
     if include_soul:
         soul = load_agent_soul(agent_cfg.name) or ""
@@ -91,42 +92,43 @@ def _agent_config_to_response(agent_cfg: AgentConfig, include_soul: bool = False
 @router.get(
     "/agents",
     response_model=AgentsListResponse,
-    summary="List Custom Agents",
-    description="List all custom agents available in the agents directory.",
+    summary="获取自定义 Agent 列表",
+    description="列出 agents 目录下所有可用的自定义 Agent。",
 )
 async def list_agents() -> AgentsListResponse:
-    """List all custom agents.
+    """列出所有自定义 Agent。
 
     Returns:
-        List of all custom agents with their metadata (without soul content).
+        包含所有自定义 Agent 元数据的列表 (不包含 soul 内容)。
     """
     try:
         agents = list_custom_agents()
         return AgentsListResponse(agents=[_agent_config_to_response(a) for a in agents])
     except Exception as e:
         logger.error(f"Failed to list agents: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to list agents: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取 Agent 列表失败: {str(e)}")
 
 
 @router.get(
     "/agents/check",
-    summary="Check Agent Name",
-    description="Validate an agent name and check if it is available (case-insensitive).",
+    summary="检查 Agent 名称可用性",
+    description="验证 Agent 名称格式并检查是否已被占用 (不区分大小写)。",
 )
 async def check_agent_name(name: str) -> dict:
-    """Check whether an agent name is valid and not yet taken.
+    """检查 Agent 名称是否有效且未被占用。
 
     Args:
-        name: The agent name to check.
+        name: 待检查的 Agent 名称。
 
     Returns:
         ``{"available": true/false, "name": "<normalized>"}``
 
     Raises:
-        HTTPException: 422 if the name is invalid.
+        HTTPException: 如果名称无效，返回 422 错误。
     """
     _validate_agent_name(name)
     normalized = _normalize_agent_name(name)
+    # 检查对应目录是否存在
     available = not get_paths().agent_dir(normalized).exists()
     return {"available": available, "name": normalized}
 
@@ -134,20 +136,20 @@ async def check_agent_name(name: str) -> dict:
 @router.get(
     "/agents/{name}",
     response_model=AgentResponse,
-    summary="Get Custom Agent",
-    description="Retrieve details and SOUL.md content for a specific custom agent.",
+    summary="获取单个自定义 Agent",
+    description="获取特定自定义 Agent 的详情和 SOUL.md 内容。",
 )
 async def get_agent(name: str) -> AgentResponse:
-    """Get a specific custom agent by name.
+    """根据名称获取特定的自定义 Agent。
 
     Args:
-        name: The agent name.
+        name: Agent 名称。
 
     Returns:
-        Agent details including SOUL.md content.
+        Agent 详情 (包含 SOUL.md 内容)。
 
     Raises:
-        HTTPException: 404 if agent not found.
+        HTTPException: 如果找不到 Agent，返回 404 错误。
     """
     _validate_agent_name(name)
     name = _normalize_agent_name(name)
@@ -156,30 +158,30 @@ async def get_agent(name: str) -> AgentResponse:
         agent_cfg = load_agent_config(name)
         return _agent_config_to_response(agent_cfg, include_soul=True)
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
+        raise HTTPException(status_code=404, detail=f"未找到 Agent '{name}'")
     except Exception as e:
         logger.error(f"Failed to get agent '{name}': {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get agent: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取 Agent 失败: {str(e)}")
 
 
 @router.post(
     "/agents",
     response_model=AgentResponse,
     status_code=201,
-    summary="Create Custom Agent",
-    description="Create a new custom agent with its config and SOUL.md.",
+    summary="创建自定义 Agent",
+    description="创建一个新的自定义 Agent，包含其配置和 SOUL.md。",
 )
 async def create_agent_endpoint(request: AgentCreateRequest) -> AgentResponse:
-    """Create a new custom agent.
+    """创建一个新的自定义 Agent。
 
     Args:
-        request: The agent creation request.
+        request: 创建 Agent 的请求体。
 
     Returns:
-        The created agent details.
+        创建成功的 Agent 详情。
 
     Raises:
-        HTTPException: 409 if agent already exists, 422 if name is invalid.
+        HTTPException: 如果 Agent 已存在返回 409，名称无效返回 422。
     """
     _validate_agent_name(request.name)
     normalized_name = _normalize_agent_name(request.name)
@@ -187,12 +189,13 @@ async def create_agent_endpoint(request: AgentCreateRequest) -> AgentResponse:
     agent_dir = get_paths().agent_dir(normalized_name)
 
     if agent_dir.exists():
-        raise HTTPException(status_code=409, detail=f"Agent '{normalized_name}' already exists")
+        raise HTTPException(status_code=409, detail=f"Agent '{normalized_name}' 已存在")
 
     try:
+        # 创建 Agent 目录
         agent_dir.mkdir(parents=True, exist_ok=True)
 
-        # Write config.yaml
+        # 写入 config.yaml 配置文件
         config_data: dict = {"name": normalized_name}
         if request.description:
             config_data["description"] = request.description
@@ -205,7 +208,7 @@ async def create_agent_endpoint(request: AgentCreateRequest) -> AgentResponse:
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f, default_flow_style=False, allow_unicode=True)
 
-        # Write SOUL.md
+        # 写入 SOUL.md 人设文件
         soul_file = agent_dir / "SOUL.md"
         soul_file.write_text(request.soul, encoding="utf-8")
 
@@ -217,31 +220,31 @@ async def create_agent_endpoint(request: AgentCreateRequest) -> AgentResponse:
     except HTTPException:
         raise
     except Exception as e:
-        # Clean up on failure
+        # 失败时清理已创建的目录
         if agent_dir.exists():
             shutil.rmtree(agent_dir)
         logger.error(f"Failed to create agent '{request.name}': {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to create agent: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"创建 Agent 失败: {str(e)}")
 
 
 @router.put(
     "/agents/{name}",
     response_model=AgentResponse,
-    summary="Update Custom Agent",
-    description="Update an existing custom agent's config and/or SOUL.md.",
+    summary="更新自定义 Agent",
+    description="更新现有自定义 Agent 的配置和/或 SOUL.md。",
 )
 async def update_agent(name: str, request: AgentUpdateRequest) -> AgentResponse:
-    """Update an existing custom agent.
+    """更新现有的自定义 Agent。
 
     Args:
-        name: The agent name.
-        request: The update request (all fields optional).
+        name: Agent 名称。
+        request: 更新请求体 (所有字段均为可选)。
 
     Returns:
-        The updated agent details.
+        更新后的 Agent 详情。
 
     Raises:
-        HTTPException: 404 if agent not found.
+        HTTPException: 如果找不到 Agent，返回 404 错误。
     """
     _validate_agent_name(name)
     name = _normalize_agent_name(name)
@@ -249,12 +252,12 @@ async def update_agent(name: str, request: AgentUpdateRequest) -> AgentResponse:
     try:
         agent_cfg = load_agent_config(name)
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
+        raise HTTPException(status_code=404, detail=f"未找到 Agent '{name}'")
 
     agent_dir = get_paths().agent_dir(name)
 
     try:
-        # Update config if any config fields changed
+        # 如果有任何配置字段变更，则更新 config.yaml
         config_changed = any(v is not None for v in [request.description, request.model, request.tool_groups])
 
         if config_changed:
@@ -274,7 +277,7 @@ async def update_agent(name: str, request: AgentUpdateRequest) -> AgentResponse:
             with open(config_file, "w", encoding="utf-8") as f:
                 yaml.dump(updated, f, default_flow_style=False, allow_unicode=True)
 
-        # Update SOUL.md if provided
+        # 如果提供了 soul 内容，则更新 SOUL.md
         if request.soul is not None:
             soul_path = agent_dir / "SOUL.md"
             soul_path.write_text(request.soul, encoding="utf-8")
@@ -288,32 +291,32 @@ async def update_agent(name: str, request: AgentUpdateRequest) -> AgentResponse:
         raise
     except Exception as e:
         logger.error(f"Failed to update agent '{name}': {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to update agent: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"更新 Agent 失败: {str(e)}")
 
 
 class UserProfileResponse(BaseModel):
-    """Response model for the global user profile (USER.md)."""
+    """全局用户画像 (USER.md) 的响应模型。"""
 
-    content: str | None = Field(default=None, description="USER.md content, or null if not yet created")
+    content: str | None = Field(default=None, description="USER.md 内容，如果尚未创建则为 null")
 
 
 class UserProfileUpdateRequest(BaseModel):
-    """Request body for setting the global user profile."""
+    """设置全局用户画像的请求体。"""
 
-    content: str = Field(default="", description="USER.md content — describes the user's background and preferences")
+    content: str = Field(default="", description="USER.md 内容 — 描述用户的背景和偏好")
 
 
 @router.get(
     "/user-profile",
     response_model=UserProfileResponse,
-    summary="Get User Profile",
-    description="Read the global USER.md file that is injected into all custom agents.",
+    summary="获取用户画像",
+    description="读取注入到所有自定义 Agent 中的全局 USER.md 文件。",
 )
 async def get_user_profile() -> UserProfileResponse:
-    """Return the current USER.md content.
+    """返回当前的 USER.md 内容。
 
     Returns:
-        UserProfileResponse with content=None if USER.md does not exist yet.
+        UserProfileResponse，如果 USER.md 不存在则 content=None。
     """
     try:
         user_md_path = get_paths().user_md_file
@@ -323,23 +326,23 @@ async def get_user_profile() -> UserProfileResponse:
         return UserProfileResponse(content=raw or None)
     except Exception as e:
         logger.error(f"Failed to read user profile: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to read user profile: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"读取用户画像失败: {str(e)}")
 
 
 @router.put(
     "/user-profile",
     response_model=UserProfileResponse,
-    summary="Update User Profile",
-    description="Write the global USER.md file that is injected into all custom agents.",
+    summary="更新用户画像",
+    description="写入全局 USER.md 文件，该文件会注入到所有自定义 Agent 中。",
 )
 async def update_user_profile(request: UserProfileUpdateRequest) -> UserProfileResponse:
-    """Create or overwrite the global USER.md.
+    """创建或覆盖全局 USER.md。
 
     Args:
-        request: The update request with the new USER.md content.
+        request: 包含新 USER.md 内容的更新请求。
 
     Returns:
-        UserProfileResponse with the saved content.
+        包含已保存内容的 UserProfileResponse。
     """
     try:
         paths = get_paths()
@@ -349,23 +352,23 @@ async def update_user_profile(request: UserProfileUpdateRequest) -> UserProfileR
         return UserProfileResponse(content=request.content or None)
     except Exception as e:
         logger.error(f"Failed to update user profile: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to update user profile: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"更新用户画像失败: {str(e)}")
 
 
 @router.delete(
     "/agents/{name}",
     status_code=204,
-    summary="Delete Custom Agent",
-    description="Delete a custom agent and all its files (config, SOUL.md, memory).",
+    summary="删除自定义 Agent",
+    description="删除自定义 Agent 及其所有文件 (config, SOUL.md, memory)。",
 )
 async def delete_agent(name: str) -> None:
-    """Delete a custom agent.
+    """删除一个自定义 Agent。
 
     Args:
-        name: The agent name.
+        name: Agent 名称。
 
     Raises:
-        HTTPException: 404 if agent not found.
+        HTTPException: 如果找不到 Agent，返回 404 错误。
     """
     _validate_agent_name(name)
     name = _normalize_agent_name(name)
@@ -373,11 +376,11 @@ async def delete_agent(name: str) -> None:
     agent_dir = get_paths().agent_dir(name)
 
     if not agent_dir.exists():
-        raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
+        raise HTTPException(status_code=404, detail=f"未找到 Agent '{name}'")
 
     try:
         shutil.rmtree(agent_dir)
         logger.info(f"Deleted agent '{name}' from {agent_dir}")
     except Exception as e:
         logger.error(f"Failed to delete agent '{name}': {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to delete agent: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"删除 Agent 失败: {str(e)}")

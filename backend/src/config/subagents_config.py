@@ -1,4 +1,4 @@
-"""Configuration for the subagent system loaded from config.yaml."""
+"""从 config.yaml 加载的子代理系统配置。"""
 
 import logging
 
@@ -8,36 +8,36 @@ logger = logging.getLogger(__name__)
 
 
 class SubagentOverrideConfig(BaseModel):
-    """Per-agent configuration overrides."""
+    """每个代理的配置覆盖。"""
 
     timeout_seconds: int | None = Field(
         default=None,
         ge=1,
-        description="Timeout in seconds for this subagent (None = use global default)",
+        description="此子代理的超时时间（秒）（None = 使用全局默认值）",
     )
 
 
 class SubagentsAppConfig(BaseModel):
-    """Configuration for the subagent system."""
+    """子代理系统配置。"""
 
     timeout_seconds: int = Field(
         default=900,
         ge=1,
-        description="Default timeout in seconds for all subagents (default: 900 = 15 minutes)",
+        description="所有子代理的默认超时时间（秒）（默认：900 = 15 分钟）",
     )
     agents: dict[str, SubagentOverrideConfig] = Field(
         default_factory=dict,
-        description="Per-agent configuration overrides keyed by agent name",
+        description="以代理名称为键的每个代理的配置覆盖",
     )
 
     def get_timeout_for(self, agent_name: str) -> int:
-        """Get the effective timeout for a specific agent.
+        """获取特定代理的有效超时时间。
 
         Args:
-            agent_name: The name of the subagent.
+            agent_name: 子代理名称。
 
         Returns:
-            The timeout in seconds, using per-agent override if set, otherwise global default.
+            超时时间（秒），如果设置了覆盖则使用覆盖值，否则使用全局默认值。
         """
         override = self.agents.get(agent_name)
         if override is not None and override.timeout_seconds is not None:
@@ -49,12 +49,12 @@ _subagents_config: SubagentsAppConfig = SubagentsAppConfig()
 
 
 def get_subagents_app_config() -> SubagentsAppConfig:
-    """Get the current subagents configuration."""
+    """获取当前子代理配置。"""
     return _subagents_config
 
 
 def load_subagents_config_from_dict(config_dict: dict) -> None:
-    """Load subagents configuration from a dictionary."""
+    """从字典加载子代理配置。"""
     global _subagents_config
     _subagents_config = SubagentsAppConfig(**config_dict)
 

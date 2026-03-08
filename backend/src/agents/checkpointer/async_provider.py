@@ -1,18 +1,17 @@
-"""Async checkpointer factory.
+"""异步检查点工厂 (Async Checkpointer Factory)。
 
-Provides an **async context manager** for long-running async servers that need
-proper resource cleanup.
+为需要适当资源清理的长时间运行的异步服务器提供 **异步上下文管理器**。
 
-Supported backends: memory, sqlite, postgres.
+支持的后端：memory (内存), sqlite, postgres。
 
-Usage (e.g. FastAPI lifespan)::
+用法 (例如 FastAPI 生命周期)::
 
     from src.agents.checkpointer.async_provider import make_checkpointer
 
     async with make_checkpointer() as checkpointer:
-        app.state.checkpointer = checkpointer  # None if not configured
+        app.state.checkpointer = checkpointer  # 如果未配置则为 None
 
-For sync usage see :mod:`src.agents.checkpointer.provider`.
+同步用法请参见 :mod:`src.agents.checkpointer.provider`。
 """
 
 from __future__ import annotations
@@ -34,13 +33,13 @@ from src.config.app_config import get_app_config
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Async factory
+# 异步工厂 (Async factory)
 # ---------------------------------------------------------------------------
 
 
 @contextlib.asynccontextmanager
 async def _async_checkpointer(config) -> AsyncIterator[Checkpointer]:
-    """Async context manager that constructs and tears down a checkpointer."""
+    """构建和拆除检查点保存器的异步上下文管理器。"""
     if config.type == "memory":
         from langgraph.checkpoint.memory import InMemorySaver
 
@@ -56,7 +55,7 @@ async def _async_checkpointer(config) -> AsyncIterator[Checkpointer]:
         import pathlib
 
         conn_str = _resolve_sqlite_conn_str(config.connection_string or "store.db")
-        # Only create parent directories for real filesystem paths
+        # 仅为真实文件系统路径创建父目录
         if conn_str != ":memory:" and not conn_str.startswith("file:"):
             pathlib.Path(conn_str).parent.mkdir(parents=True, exist_ok=True)
         async with AsyncSqliteSaver.from_conn_string(conn_str) as saver:
@@ -78,23 +77,23 @@ async def _async_checkpointer(config) -> AsyncIterator[Checkpointer]:
             yield saver
         return
 
-    raise ValueError(f"Unknown checkpointer type: {config.type!r}")
+    raise ValueError(f"未知的检查点类型: {config.type!r}")
 
 
 # ---------------------------------------------------------------------------
-# Public async context manager
+# 公共异步上下文管理器
 # ---------------------------------------------------------------------------
 
 
 @contextlib.asynccontextmanager
 async def make_checkpointer() -> AsyncIterator[Checkpointer | None]:
-    """Async context manager that yields a checkpointer for the caller's lifetime.
-    Resources are opened on enter and closed on exit — no global state::
+    """生成调用者生命周期内的检查点保存器的异步上下文管理器。
+    资源在进入时打开，退出时关闭 —— 无全局状态::
 
         async with make_checkpointer() as checkpointer:
             app.state.checkpointer = checkpointer
 
-    Yields ``None`` when no checkpointer is configured in *config.yaml*.
+    当 *config.yaml* 中未配置检查点保存器时 yield ``None``。
     """
 
     config = get_app_config()

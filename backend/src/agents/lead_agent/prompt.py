@@ -5,13 +5,13 @@ from src.skills import load_skills
 
 
 def _build_subagent_section(max_concurrent: int) -> str:
-    """Build the subagent system prompt section with dynamic concurrency limit.
+    """使用动态并发限制构建子 Agent 系统 Prompt 部分。
 
     Args:
-        max_concurrent: Maximum number of concurrent subagent calls allowed per response.
+        max_concurrent: 每次响应允许的最大并发子 Agent 调用数。
 
     Returns:
-        Formatted subagent section string.
+        格式化的子 Agent 部分字符串。
     """
     n = max_concurrent
     return f"""<subagent_system>
@@ -283,13 +283,13 @@ Recent breakthroughs in language models have also accelerated progress
 
 
 def _get_memory_context(agent_name: str | None = None) -> str:
-    """Get memory context for injection into system prompt.
+    """获取要注入到系统 Prompt 中的记忆上下文。
 
     Args:
-        agent_name: If provided, loads per-agent memory. If None, loads global memory.
+        agent_name: 如果提供，加载每个 Agent 独立的记忆。如果为 None，加载全局记忆。
 
     Returns:
-        Formatted memory context string wrapped in XML tags, or empty string if disabled.
+        包裹在 XML 标签中的格式化记忆上下文，如果未启用则返回空字符串。
     """
     try:
         from src.agents.memory import format_memory_for_injection, get_memory_data
@@ -315,10 +315,10 @@ def _get_memory_context(agent_name: str | None = None) -> str:
 
 
 def get_skills_prompt_section(available_skills: set[str] | None = None) -> str:
-    """Generate the skills prompt section with available skills list.
+    """生成包含可用技能列表的技能 Prompt 部分。
 
-    Returns the <skill_system>...</skill_system> block listing all enabled skills,
-    suitable for injection into any agent's system prompt.
+    返回列出所有已启用技能的 <skill_system>...</skill_system> 块，
+    适合注入到任何 Agent 的系统 Prompt 中。
     """
     skills = load_skills(enabled_only=True)
 
@@ -359,7 +359,7 @@ You have access to skills that provide optimized workflows for specific tasks. E
 
 
 def get_agent_soul(agent_name: str | None) -> str:
-    # Append SOUL.md (agent personality) if present
+    # 如果存在 SOUL.md (Agent 人设)，则追加
     soul = load_agent_soul(agent_name)
     if soul:
         return f"<soul>\n{soul}\n</soul>\n" if soul else ""
@@ -367,14 +367,14 @@ def get_agent_soul(agent_name: str | None) -> str:
 
 
 def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagents: int = 3, *, agent_name: str | None = None, available_skills: set[str] | None = None) -> str:
-    # Get memory context
+    # 获取记忆上下文
     memory_context = _get_memory_context(agent_name)
 
-    # Include subagent section only if enabled (from runtime parameter)
+    # 仅当启用时包含子 Agent 部分 (来自运行时参数)
     n = max_concurrent_subagents
     subagent_section = _build_subagent_section(n) if subagent_enabled else ""
 
-    # Add subagent reminder to critical_reminders if enabled
+    # 如果启用，添加子 Agent 提醒到 critical_reminders
     subagent_reminder = (
         "- **Orchestrator Mode**: You are a task orchestrator - decompose complex tasks into parallel sub-tasks. "
         f"**HARD LIMIT: max {n} `task` calls per response.** "
@@ -383,7 +383,7 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
         else ""
     )
 
-    # Add subagent thinking guidance if enabled
+    # 如果启用，添加子 Agent 思考指导
     subagent_thinking = (
         "- **DECOMPOSITION CHECK: Can this task be broken into 2+ parallel sub-tasks? If YES, COUNT them. "
         f"If count > {n}, you MUST plan batches of ≤{n} and only launch the FIRST batch now. "
@@ -392,10 +392,10 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
         else ""
     )
 
-    # Get skills section
+    # 获取技能部分
     skills_section = get_skills_prompt_section(available_skills)
 
-    # Format the prompt with dynamic skills and memory
+    # 使用动态技能和记忆格式化 Prompt
     prompt = SYSTEM_PROMPT_TEMPLATE.format(
         agent_name=agent_name or "DeerFlow 2.0",
         soul=get_agent_soul(agent_name),
