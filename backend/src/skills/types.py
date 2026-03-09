@@ -1,35 +1,36 @@
+"""技能类型定义 (Skill Types)。"""
+
 from dataclasses import dataclass
 from pathlib import Path
 
 
 @dataclass
 class Skill:
-    """Represents a skill with its metadata and file path"""
+    """表示一个技能及其元数据和文件路径。"""
 
-    name: str
-    description: str
-    license: str | None
-    skill_dir: Path
-    skill_file: Path
-    relative_path: Path  # Relative path from category root to skill directory
-    category: str  # 'public' or 'custom'
-    enabled: bool = False  # Whether this skill is enabled
+    name: str  # 技能名称
+    description: str  # 技能描述
+    license: str | None  # 许可证信息
+    skill_dir: Path  # 技能所在的目录路径
+    skill_file: Path  # SKILL.md 文件的完整路径
+    relative_path: Path  # 从类别根目录 (skills/{category}) 到技能目录的相对路径
+    category: str  # 'public' 或 'custom'
+    enabled: bool = False  # 此技能是否已启用
 
     @property
     def skill_path(self) -> str:
-        """Returns the relative path from the category root (skills/{category}) to this skill's directory"""
+        """返回从类别根目录 (skills/{category}) 到此技能目录的相对路径字符串。"""
         path = self.relative_path.as_posix()
         return "" if path == "." else path
 
     def get_container_path(self, container_base_path: str = "/mnt/skills") -> str:
-        """
-        Get the full path to this skill in the container.
+        """获取此技能在沙箱容器中的完整挂载路径。
 
         Args:
-            container_base_path: Base path where skills are mounted in the container
+            container_base_path: 技能在容器中的挂载基路径 (默认为 /mnt/skills)。
 
         Returns:
-            Full container path to the skill directory
+            技能目录的完整容器路径。
         """
         category_base = f"{container_base_path}/{self.category}"
         skill_path = self.skill_path
@@ -38,14 +39,13 @@ class Skill:
         return category_base
 
     def get_container_file_path(self, container_base_path: str = "/mnt/skills") -> str:
-        """
-        Get the full path to this skill's main file (SKILL.md) in the container.
+        """获取此技能的主文件 (SKILL.md) 在沙箱容器中的完整路径。
 
         Args:
-            container_base_path: Base path where skills are mounted in the container
+            container_base_path: 技能在容器中的挂载基路径 (默认为 /mnt/skills)。
 
         Returns:
-            Full container path to the skill's SKILL.md file
+            SKILL.md 文件的完整容器路径。
         """
         return f"{self.get_container_path(container_base_path)}/SKILL.md"
 
