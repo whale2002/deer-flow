@@ -1,3 +1,5 @@
+"""列出目录内容的工具函数。"""
+
 import fnmatch
 from pathlib import Path
 
@@ -62,51 +64,79 @@ IGNORE_PATTERNS = [
 
 
 def _should_ignore(name: str) -> bool:
-    """Check if a file/directory name matches any ignore pattern."""
+    """检查文件名/目录名是否匹配任何忽略模式。"""
     for pattern in IGNORE_PATTERNS:
         if fnmatch.fnmatch(name, pattern):
             return True
     return False
 
 
-def list_dir(path: str, max_depth: int = 2) -> list[str]:
-    """
-    List files and directories up to max_depth levels deep.
+def list_dir(path: str, max_depth: int = 2, _current_depth: int = 0, _base_path: str | None = None) -> list[str]:
+    """列出目录内容，最深为指定深度。
+
+    返回目录树结构的字符串表示，每行缩进表示深度。
 
     Args:
-        path: The root directory path to list.
-        max_depth: Maximum depth to traverse (default: 2).
-                   1 = only direct children, 2 = children + grandchildren, etc.
+        path: 目录的绝对路径。
+        max_depth: 最大遍历深度（默认 2）。
+        _current_depth: 内部参数，用于跟踪当前递归深度。
+        _base_path: 内部参数，用于跟踪遍历的基准路径。
 
     Returns:
-        A list of absolute paths for files and directories,
-        excluding items matching IGNORE_PATTERNS.
+        目录内容的列表，每行表示一个文件或目录，带有适当的缩进。
     """
-    result: list[str] = []
-    root_path = Path(path).resolve()
+    if _current_depth == 0:
+        _base_path = str(Path(path).resolve())
 
-    if not root_path.is_dir():
-        return result
+    path_obj = Path(path)
+    result = []
 
-    def _traverse(current_path: Path, current_depth: int) -> None:
-        """Recursively traverse directories up to max_depth."""
-        if current_depth > max_depth:
-            return
+    if not path_obj.exists():
+        raise FileNotFoundError(f"路径不存在: {path}")
+    if not path_obj.is_dir():
+        raise NotADirectoryError(f"路径不是目录: {path}")
 
-        try:
-            for item in current_path.iterdir():
-                if _should_ignore(item.name):
-                    continue
+    try:
+        entries = sorted(path_obj.iterdir(), key=lambda x: (not x.is_dir(), x.name))
+    except PermissionError:
+        return [f"{'  ' * _current_depth}[权限被拒绝]"]
 
-                post_fix = "/" if item.is_dir() else ""
-                result.append(str(item.resolve()) + post_fix)
+    for i, entry in enumerate(entries):
+        is_last = i == len(entries) - 1
+        prefix = "└── " if is_last else "├── "
+        connector = "  " if is_last else "│  "
 
-                # Recurse into subdirectories if not at max depth
-                if item.is_dir() and current_depth < max_depth:
-                    _traverse(item, current_depth + 1)
-        except PermissionError:
-            pass
+        if entry.is_dir():
+            if _should_ignore(entry.name):
+                continue
+            result.append(f"{'  ' * _current_depth}{prefix}{entry.name}/")
+            if _current_depth < max_depth:
+                try:
+                    sub_entries = list_dir(str(entry), max_depth, _current_depth + 1, _base_path)
+                    result.extend(sub_entries)
+                except PermissionError:
+                    result.append(f"{'  ' * (_current_depth + 1)}[权限被拒绝]")
+        else:
+            if _should_ignore(entry.name):
+                continue
+            size = entry.stat().st_size
+            size_str = format_size(size)
+            result.append(f"{'  ' * _current_depth}{prefix}{entry.name} ({size_str})")
 
-    _traverse(root_path, 1)
+    return result
 
-    return sorted(result)
+
+def format_size(size: int) -> str:
+    """格式化文件大小为人类可读的字符串。
+
+    Args:
+        size: 以字节为单位的文件大小。
+
+    Returns:
+        格式化的字符串，如 "1.5 KB"、"2.3 MB" 等。
+    """
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
+        if size < 1024.0:
+            return f"{size:.1f} {unit}"
+        size /= 1024.0
+    return f"{size:.1f} PB"

@@ -1,3 +1,4 @@
+"""沙箱工具 - Agent 可调用的文件操作和命令执行工具。"""
 import re
 
 from langchain.tools import ToolRuntime, tool
@@ -15,19 +16,19 @@ from src.sandbox.sandbox_provider import get_sandbox_provider
 
 
 def replace_virtual_path(path: str, thread_data: ThreadDataState | None) -> str:
-    """Replace virtual /mnt/user-data paths with actual thread data paths.
+    """将虚拟路径 /mnt/user-data 替换为实际的线程数据路径。
 
-    Mapping:
+    映射关系：
         /mnt/user-data/workspace/* -> thread_data['workspace_path']/*
         /mnt/user-data/uploads/* -> thread_data['uploads_path']/*
         /mnt/user-data/outputs/* -> thread_data['outputs_path']/*
 
     Args:
-        path: The path that may contain virtual path prefix.
-        thread_data: The thread data containing actual paths.
+        path: 可能包含虚拟路径前缀的路径。
+        thread_data: 包含实际路径的线程数据。
 
     Returns:
-        The path with virtual prefix replaced by actual path.
+        虚拟前缀替换为实际路径后的路径。
     """
     if not path.startswith(VIRTUAL_PATH_PREFIX):
         return path
@@ -35,19 +36,19 @@ def replace_virtual_path(path: str, thread_data: ThreadDataState | None) -> str:
     if thread_data is None:
         return path
 
-    # Map virtual subdirectories to thread_data keys
+    # 将虚拟子目录映射到 thread_data 的键
     path_mapping = {
         "workspace": thread_data.get("workspace_path"),
         "uploads": thread_data.get("uploads_path"),
         "outputs": thread_data.get("outputs_path"),
     }
 
-    # Extract the subdirectory after /mnt/user-data/
+    # 提取 /mnt/user-data/ 后的相对路径
     relative_path = path[len(VIRTUAL_PATH_PREFIX) :].lstrip("/")
     if not relative_path:
         return path
 
-    # Find which subdirectory this path belongs to
+    # 找出该路径属于哪个子目录
     parts = relative_path.split("/", 1)
     subdir = parts[0]
     rest = parts[1] if len(parts) > 1 else ""
@@ -62,14 +63,14 @@ def replace_virtual_path(path: str, thread_data: ThreadDataState | None) -> str:
 
 
 def replace_virtual_paths_in_command(command: str, thread_data: ThreadDataState | None) -> str:
-    """Replace all virtual /mnt/user-data paths in a command string.
+    """替换命令字符串中的所有虚拟路径 /mnt/user-data。
 
     Args:
-        command: The command string that may contain virtual paths.
-        thread_data: The thread data containing actual paths.
+        command: 可能包含虚拟路径的命令字符串。
+        thread_data: 包含实际路径的线程数据。
 
     Returns:
-        The command with all virtual paths replaced.
+        所有虚拟路径替换后的命令。
     """
     if VIRTUAL_PATH_PREFIX not in command:
         return command
@@ -77,7 +78,7 @@ def replace_virtual_paths_in_command(command: str, thread_data: ThreadDataState 
     if thread_data is None:
         return command
 
-    # Pattern to match /mnt/user-data followed by path characters
+    # 匹配 /mnt/user-data 后跟路径字符的模式
     pattern = re.compile(rf"{re.escape(VIRTUAL_PATH_PREFIX)}(/[^\s\"';&|<>()]*)?")
 
     def replace_match(match: re.Match) -> str:
@@ -88,7 +89,7 @@ def replace_virtual_paths_in_command(command: str, thread_data: ThreadDataState 
 
 
 def get_thread_data(runtime: ToolRuntime[ContextT, ThreadState] | None) -> ThreadDataState | None:
-    """Extract thread_data from runtime state."""
+    """从运行时状态中提取 thread_data。"""
     if runtime is None:
         return None
     if runtime.state is None:
@@ -97,10 +98,9 @@ def get_thread_data(runtime: ToolRuntime[ContextT, ThreadState] | None) -> Threa
 
 
 def is_local_sandbox(runtime: ToolRuntime[ContextT, ThreadState] | None) -> bool:
-    """Check if the current sandbox is a local sandbox.
+    """检查当前沙箱是否为本地沙箱。
 
-    Path replacement is only needed for local sandbox since aio sandbox
-    already has /mnt/user-data mounted in the container.
+    仅本地沙箱需要路径替换，因为 aio 沙箱容器内已有 /mnt/user-data 挂载。
     """
     if runtime is None:
         return False
@@ -113,14 +113,14 @@ def is_local_sandbox(runtime: ToolRuntime[ContextT, ThreadState] | None) -> bool
 
 
 def sandbox_from_runtime(runtime: ToolRuntime[ContextT, ThreadState] | None = None) -> Sandbox:
-    """Extract sandbox instance from tool runtime.
+    """从工具运行时提取沙箱实例。
 
-    DEPRECATED: Use ensure_sandbox_initialized() for lazy initialization support.
-    This function assumes sandbox is already initialized and will raise error if not.
+    已弃用：请使用 ensure_sandbox_initialized() 以支持懒初始化。
+    此函数假设沙箱已初始化，如果未初始化将抛出错误。
 
     Raises:
-        SandboxRuntimeError: If runtime is not available or sandbox state is missing.
-        SandboxNotFoundError: If sandbox with the given ID cannot be found.
+        SandboxRuntimeError: 如果运行时不可用或缺少沙箱状态。
+        SandboxNotFoundError: 如果找不到给定 ID 的沙箱。
     """
     if runtime is None:
         raise SandboxRuntimeError("Tool runtime not available")
@@ -139,22 +139,22 @@ def sandbox_from_runtime(runtime: ToolRuntime[ContextT, ThreadState] | None = No
 
 
 def ensure_sandbox_initialized(runtime: ToolRuntime[ContextT, ThreadState] | None = None) -> Sandbox:
-    """Ensure sandbox is initialized, acquiring lazily if needed.
+    """确保沙箱已初始化，必要时进行懒获取。
 
-    On first call, acquires a sandbox from the provider and stores it in runtime state.
-    Subsequent calls return the existing sandbox.
+    首次调用时，从提供者获取沙箱并存储在运行时状态中。
+    后续调用返回现有沙箱。
 
-    Thread-safety is guaranteed by the provider's internal locking mechanism.
+    线程安全由提供者的内部锁定机制保证。
 
     Args:
-        runtime: Tool runtime containing state and context.
+        runtime: 包含状态和上下文的工具运行时。
 
     Returns:
-        Initialized sandbox instance.
+        初始化的沙箱实例。
 
     Raises:
-        SandboxRuntimeError: If runtime is not available or thread_id is missing.
-        SandboxNotFoundError: If sandbox acquisition fails.
+        SandboxRuntimeError: 如果运行时不可用或缺少 thread_id。
+        SandboxNotFoundError: 如果沙箱获取失败。
     """
     if runtime is None:
         raise SandboxRuntimeError("Tool runtime not available")
@@ -162,7 +162,7 @@ def ensure_sandbox_initialized(runtime: ToolRuntime[ContextT, ThreadState] | Non
     if runtime.state is None:
         raise SandboxRuntimeError("Tool runtime state not available")
 
-    # Check if sandbox already exists in state
+    # 检查沙箱是否已存在于状态中
     sandbox_state = runtime.state.get("sandbox")
     if sandbox_state is not None:
         sandbox_id = sandbox_state.get("sandbox_id")
@@ -170,21 +170,21 @@ def ensure_sandbox_initialized(runtime: ToolRuntime[ContextT, ThreadState] | Non
             sandbox = get_sandbox_provider().get(sandbox_id)
             if sandbox is not None:
                 return sandbox
-            # Sandbox was released, fall through to acquire new one
+            # 沙箱已释放，继续获取新的
 
-    # Lazy acquisition: get thread_id and acquire sandbox
+    # 懒获取：获取 thread_id 并获取沙箱
     thread_id = runtime.context.get("thread_id")
     if thread_id is None:
         raise SandboxRuntimeError("Thread ID not available in runtime context")
 
     provider = get_sandbox_provider()
-    print(f"Lazy acquiring sandbox for thread {thread_id}")
+    print(f"懒获取沙箱 for thread {thread_id}")
     sandbox_id = provider.acquire(thread_id)
 
-    # Update runtime state - this persists across tool calls
+    # 更新运行时状态 - 这在工具调用之间持久化
     runtime.state["sandbox"] = {"sandbox_id": sandbox_id}
 
-    # Retrieve and return the sandbox
+    # 获取并返回沙箱
     sandbox = provider.get(sandbox_id)
     if sandbox is None:
         raise SandboxNotFoundError("Sandbox not found after acquisition", sandbox_id=sandbox_id)
@@ -193,19 +193,19 @@ def ensure_sandbox_initialized(runtime: ToolRuntime[ContextT, ThreadState] | Non
 
 
 def ensure_thread_directories_exist(runtime: ToolRuntime[ContextT, ThreadState] | None) -> None:
-    """Ensure thread data directories (workspace, uploads, outputs) exist.
+    """确保线程数据目录（workspace, uploads, outputs）存在。
 
-    This function is called lazily when any sandbox tool is first used.
-    For local sandbox, it creates the directories on the filesystem.
-    For other sandboxes (like aio), directories are already mounted in the container.
+    此函数在首次使用任何沙箱工具时懒调用。
+    对于本地沙箱，它会在文件系统上创建目录。
+    对于其他沙箱（如 aio），目录已在容器中挂载。
 
     Args:
-        runtime: Tool runtime containing state and context.
+        runtime: 包含状态和上下文的工具运行时。
     """
     if runtime is None:
         return
 
-    # Only create directories for local sandbox
+    # 仅本地沙箱创建目录
     if not is_local_sandbox(runtime):
         return
 
@@ -213,11 +213,11 @@ def ensure_thread_directories_exist(runtime: ToolRuntime[ContextT, ThreadState] 
     if thread_data is None:
         return
 
-    # Check if directories have already been created
+    # 检查目录是否已创建
     if runtime.state.get("thread_directories_created"):
         return
 
-    # Create the three directories
+    # 创建三个目录
     import os
 
     for key in ["workspace_path", "uploads_path", "outputs_path"]:
@@ -225,21 +225,20 @@ def ensure_thread_directories_exist(runtime: ToolRuntime[ContextT, ThreadState] 
         if path:
             os.makedirs(path, exist_ok=True)
 
-    # Mark as created to avoid redundant operations
+    # 标记为已创建以避免冗余操作
     runtime.state["thread_directories_created"] = True
 
 
 @tool("bash", parse_docstring=True)
 def bash_tool(runtime: ToolRuntime[ContextT, ThreadState], description: str, command: str) -> str:
-    """Execute a bash command in a Linux environment.
+    """在 Linux 环境中执行 bash 命令。
 
-
-    - Use `python` to run Python code.
-    - Use `pip install` to install Python packages.
+    - 使用 `python` 运行 Python 代码。
+    - 使用 `pip install` 安装 Python 包。
 
     Args:
-        description: Explain why you are running this command in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
-        command: The bash command to execute. Always use absolute paths for files and directories.
+        description: 用简短的话解释你为什么运行这个命令。始终将此参数放在第一位。
+        command: 要执行的 bash 命令。文件和目录始终使用绝对路径。
     """
     try:
         sandbox = ensure_sandbox_initialized(runtime)
@@ -256,11 +255,11 @@ def bash_tool(runtime: ToolRuntime[ContextT, ThreadState], description: str, com
 
 @tool("ls", parse_docstring=True)
 def ls_tool(runtime: ToolRuntime[ContextT, ThreadState], description: str, path: str) -> str:
-    """List the contents of a directory up to 2 levels deep in tree format.
+    """列出目录内容，最深 2 层，以树形格式显示。
 
     Args:
-        description: Explain why you are listing this directory in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
-        path: The **absolute** path to the directory to list.
+        description: 用简短的话解释你为什么列出这个目录。始终将此参数放在第一位。
+        path: 要列出的目录的**绝对**路径。
     """
     try:
         sandbox = ensure_sandbox_initialized(runtime)
@@ -290,13 +289,13 @@ def read_file_tool(
     start_line: int | None = None,
     end_line: int | None = None,
 ) -> str:
-    """Read the contents of a text file. Use this to examine source code, configuration files, logs, or any text-based file.
+    """读取文本文件的内容。用于查看源代码、配置文件、日志或任何基于文本的文件。
 
     Args:
-        description: Explain why you are reading this file in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
-        path: The **absolute** path to the file to read.
-        start_line: Optional starting line number (1-indexed, inclusive). Use with end_line to read a specific range.
-        end_line: Optional ending line number (1-indexed, inclusive). Use with start_line to read a specific range.
+        description: 用简短的话解释你为什么读取这个文件。始终将此参数放在第一位。
+        path: 要读取的文件的**绝对**路径。
+        start_line: 可选的起始行号（从 1 开始，含）。与 end_line 一起使用以读取特定范围。
+        end_line: 可选的结束行号（从 1 开始，含）。与 start_line 一起使用以读取特定范围。
     """
     try:
         sandbox = ensure_sandbox_initialized(runtime)
@@ -330,12 +329,12 @@ def write_file_tool(
     content: str,
     append: bool = False,
 ) -> str:
-    """Write text content to a file.
+    """将文本内容写入文件。
 
     Args:
-        description: Explain why you are writing to this file in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
-        path: The **absolute** path to the file to write to. ALWAYS PROVIDE THIS PARAMETER SECOND.
-        content: The content to write to the file. ALWAYS PROVIDE THIS PARAMETER THIRD.
+        description: 用简短的话解释你为什么写入这个文件。始终将此参数放在第一位。
+        path: 要写入的文件的**绝对**路径。始终将此参数放在第二位。
+        content: 要写入文件的内容。始终将此参数放在第三位。
     """
     try:
         sandbox = ensure_sandbox_initialized(runtime)
@@ -366,15 +365,15 @@ def str_replace_tool(
     new_str: str,
     replace_all: bool = False,
 ) -> str:
-    """Replace a substring in a file with another substring.
-    If `replace_all` is False (default), the substring to replace must appear **exactly once** in the file.
+    """替换文件中的子字符串。
+    如果 `replace_all` 为 False（默认），要替换的子字符串必须在文件中**恰好出现一次**。
 
     Args:
-        description: Explain why you are replacing the substring in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
-        path: The **absolute** path to the file to replace the substring in. ALWAYS PROVIDE THIS PARAMETER SECOND.
-        old_str: The substring to replace. ALWAYS PROVIDE THIS PARAMETER THIRD.
-        new_str: The new substring. ALWAYS PROVIDE THIS PARAMETER FOURTH.
-        replace_all: Whether to replace all occurrences of the substring. If False, only the first occurrence will be replaced. Default is False.
+        description: 用简短的话解释你为什么替换这个子字符串。始终将此参数放在第一位。
+        path: 要替换子字符串的文件的**绝对**路径。始终将此参数放在第二位。
+        old_str: 要替换的子字符串。始终将此参数放在第三位。
+        new_str: 新的子字符串。始终将此参数放在第四位。
+        replace_all: 是否替换子字符串的所有出现次数。如果为 False，仅替换第一个出现的位置。默认为 False。
     """
     try:
         sandbox = ensure_sandbox_initialized(runtime)

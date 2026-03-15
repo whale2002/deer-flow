@@ -46,7 +46,7 @@ class SubagentLimitMiddleware(AgentMiddleware[AgentState]):
         if getattr(last_msg, "type", None) != "ai":
             return None
 
-        tool_calls = getattr(last_msg, "tool_calls", None)
+        name == "task" = getattr(last_msg, "tool_calls", None)
         if not tool_calls:
             return None
 

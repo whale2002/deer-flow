@@ -94,103 +94,104 @@ def _create_todo_list_middleware(is_plan_mode: bool) -> TodoListMiddleware | Non
 
     # 匹配 DeerFlow 风格的自定义 Prompt
     system_prompt = """
-<todo_list_system>
-You have access to the `write_todos` tool to help you manage and track complex multi-step objectives.
+        <todo_list_system>
+        你可以使用 `write_todos` 工具来帮助管理复杂的多步骤目标。
 
-**CRITICAL RULES:**
-- Mark todos as completed IMMEDIATELY after finishing each step - do NOT batch completions
-- Keep EXACTLY ONE task as `in_progress` at any time (unless tasks can run in parallel)
-- Update the todo list in REAL-TIME as you work - this gives users visibility into your progress
-- DO NOT use this tool for simple tasks (< 3 steps) - just complete them directly
+        **关键规则：**
+        - 完成后立即标记任务为完成状态 - 不要批量完成
+        - 同一时间只保持一个任务为 `in_progress`（除非任务可以并行运行）
+        - 实时更新待办列表 - 让用户了解你的进度
+        - 简单任务（< 3 步）不要使用此工具 - 直接完成即可
 
-**When to Use:**
-This tool is designed for complex objectives that require systematic tracking:
-- Complex multi-step tasks requiring 3+ distinct steps
-- Non-trivial tasks needing careful planning and execution
-- User explicitly requests a todo list
-- User provides multiple tasks (numbered or comma-separated list)
-- The plan may need revisions based on intermediate results
+        **适用场景：**
+        此工具适用于需要系统性跟踪的复杂目标：
+        - 需要 3 个或以上步骤的复杂任务
+        - 需要仔细规划和执行的非平凡任务
+        - 用户明确要求使用待办列表
+        - 用户提供了多个任务（编号或逗号分隔）
+        - 计划可能需要根据中间结果调整
 
-**When NOT to Use:**
-- Single, straightforward tasks
-- Trivial tasks (< 3 steps)
-- Purely conversational or informational requests
-- Simple tool calls where the approach is obvious
+        **不适用场景：**
+        - 简单直接的任务
+        - 无关紧要的任务（< 3 步骤）
+        - 纯对话或信息性请求
+        - 方法显而易见只需直接执行的任务
 
-**Best Practices:**
-- Break down complex tasks into smaller, actionable steps
-- Use clear, descriptive task names
-- Remove tasks that become irrelevant
-- Add new tasks discovered during implementation
-- Don't be afraid to revise the todo list as you learn more
+        **最佳实践：**
+        - 创建具体、可操作的任务项
+        - 将复杂任务分解为更小、可管理的步骤
+        - 使用清晰、描述性的任务名称
+        - 移除不再相关的任务
+        - 在实现过程中发现新任务时添加进去
+        - 不要害怕根据结果调整计划
 
-**Task Management:**
-Writing todos takes time and tokens - use it when helpful for managing complex problems, not for simple requests.
-</todo_list_system>
-"""
+        **任务管理：**
+        在处理复杂问题时使用它会有所帮助，简单请求则不必使用。
+        </todo_list_system>
+        """
 
-    tool_description = """Use this tool to create and manage a structured task list for complex work sessions.
+    tool_description = """使用此工具创建和管理复杂工作会话的结构化任务列表。
 
-**IMPORTANT: Only use this tool for complex tasks (3+ steps). For simple requests, just do the work directly.**
+        **重要提示：仅用于复杂任务（3 步以上）。简单请求直接完成即可。**
 
-## When to Use
+        ## 适用场景
 
-Use this tool in these scenarios:
-1. **Complex multi-step tasks**: When a task requires 3 or more distinct steps or actions
-2. **Non-trivial tasks**: Tasks requiring careful planning or multiple operations
-3. **User explicitly requests todo list**: When the user directly asks you to track tasks
-4. **Multiple tasks**: When users provide a list of things to be done
-5. **Dynamic planning**: When the plan may need updates based on intermediate results
+        在以下情况使用此工具：
+        1. **复杂多步骤任务**：需要 3 个或以上不同步骤的任务
+        2. **非平凡任务**：需要仔细规划和多次操作的任务
+        3. **用户明确要求**：用户直接要求使用待办列表
+        4. **多个任务**：用户提供了需要完成的事项列表
+        5. **动态规划**：计划可能需要根据中间结果更新
 
-## When NOT to Use
+        ## 不适用场景
 
-Skip this tool when:
-1. **The task is straightforward and takes less than 3 steps**
-2. **The task is trivial and tracking provides no benefit**
-3. **The task is purely conversational or informational**
-4. **It's clear what needs to be done and you can just do it**
+        以下情况跳过此工具：
+        1. **任务简单明了**，可以在几步内完成
+        2. **任务无关紧要**，跟踪没有好处
+        3. **纯对话或信息性请求**
+        4. **方法显而易见**，可以直接执行
 
-## How to Use
+        ## 使用方法
 
-1. **Starting a task**: Mark it as `in_progress` BEFORE beginning work
-2. **Completing a task**: Mark it as `completed` IMMEDIATELY after finishing
-3. **Updating the list**: Add new tasks, remove irrelevant ones, or update descriptions as needed
-4. **Multiple updates**: You can make several updates at once (e.g., complete one task and start the next)
+        1. **开始任务**：开始工作前标记为 `in_progress`
+        2. **完成任务**：完成后立即标记为 `completed`
+        3. **更新列表**：根据需要添加新任务、移除无关任务、更新描述
+        4. **批量更新**：可以同时完成多个更新（例如完成一个任务并开始下一个）
 
-## Task States
+        ## 任务状态
 
-- `pending`: Task not yet started
-- `in_progress`: Currently working on (can have multiple if tasks run in parallel)
-- `completed`: Task finished successfully
+        - `pending`：任务尚未开始
+        - `in_progress`：正在进行中（如果任务可以并行，可以有多个）
+        - `completed`：任务成功完成
 
-## Task Completion Requirements
+        ## 任务完成要求
 
-**CRITICAL: Only mark a task as completed when you have FULLY accomplished it.**
+        **重要：只有完全完成任务后才能标记为完成。**
 
-Never mark a task as completed if:
-- There are unresolved issues or errors
-- Work is partial or incomplete
-- You encountered blockers preventing completion
-- You couldn't find necessary resources or dependencies
-- Quality standards haven't been met
+        以下情况不要标记为完成：
+        - 有未解决的问题或错误
+        - 工作部分或不完整
+        - 遇到阻碍无法继续
+        - 无法找到必要的资源或依赖
+        - 未达到质量标准
 
-If blocked, keep the task as `in_progress` and create a new task describing what needs to be resolved.
+        如果被阻塞，保持 `in_progress` 状态，并创建新任务描述需要解决的内容。
 
-## Best Practices
+        ## 最佳实践
 
-- Create specific, actionable items
-- Break complex tasks into smaller, manageable steps
-- Use clear, descriptive task names
-- Update task status in real-time as you work
-- Mark tasks complete IMMEDIATELY after finishing (don't batch completions)
-- Remove tasks that are no longer relevant
-- **IMPORTANT**: When you write the todo list, mark your first task(s) as `in_progress` immediately
-- **IMPORTANT**: Unless all tasks are completed, always have at least one task `in_progress` to show progress
+        - 创建具体、可操作的任务项
+        - 将复杂任务分解为更小、可管理的步骤
+        - 使用清晰、描述性的任务名称
+        - 实时更新任务状态
+        - 完成后立即标记为完成（不要批量完成）
+        - 移除不再相关的任务
+        - **重要**：写入待办列表后，立即将第一个任务标记为 `in_progress`
+        - **重要**：除非所有任务都完成，始终保持至少一个任务为 `in_progress` 以显示进度
 
-Being proactive with task management demonstrates thoroughness and ensures all requirements are completed successfully.
+        积极主动的任务管理展示了严谨性，确保所有要求都能顺利完成。
 
-**Remember**: If you only need a few tool calls to complete a task and it's clear what to do, it's better to just do the task directly and NOT use this tool at all.
-"""
+        **记住**：如果只需要几个工具调用就能完成任务且方法显而易见，最好直接完成任务，而不是使用此工具。
+        """
 
     return TodoListMiddleware(system_prompt=system_prompt, tool_description=tool_description)
 
