@@ -11,137 +11,137 @@ except ImportError:
     TIKTOKEN_AVAILABLE = False
 
 # 基于对话更新记忆的 Prompt 模板
-MEMORY_UPDATE_PROMPT = """You are a memory management system. Your task is to analyze a conversation and update the user's memory profile.
+MEMORY_UPDATE_PROMPT = """你是一个记忆管理系统。你的任务是分析对话并更新用户的记忆档案。
 
-Current Memory State:
-<current_memory>
-{current_memory}
-</current_memory>
+  当前记忆状态：
+  <current_memory>
+  {current_memory}
+  </current_memory>
 
-New Conversation to Process:
-<conversation>
-{conversation}
-</conversation>
+  待处理的新对话：
+  <conversation>
+  {conversation}
+  </conversation>
 
-Instructions:
-1. Analyze the conversation for important information about the user
-2. Extract relevant facts, preferences, and context with specific details (numbers, names, technologies)
-3. Update the memory sections as needed following the detailed length guidelines below
+  指令：
+  1. 分析对话中关于用户的重要信息
+  2. 提取相关的事实、偏好和上下文，包含具体细节（数字、名称、技术）
+  3. 根据以下详细的长度指南更新记忆部分
 
-Memory Section Guidelines:
+  记忆部分指南：
 
-**User Context** (Current state - concise summaries):
-- workContext: Professional role, company, key projects, main technologies (2-3 sentences)
-  Example: Core contributor, project names with metrics (16k+ stars), technical stack
-- personalContext: Languages, communication preferences, key interests (1-2 sentences)
-  Example: Bilingual capabilities, specific interest areas, expertise domains
-- topOfMind: Multiple ongoing focus areas and priorities (3-5 sentences, detailed paragraph)
-  Example: Primary project work, parallel technical investigations, ongoing learning/tracking
-  Include: Active implementation work, troubleshooting issues, market/research interests
-  Note: This captures SEVERAL concurrent focus areas, not just one task
+  **用户上下文**（当前状态 - 简洁摘要）：
+  - workContext：职业角色、公司、关键项目、主要技术（2-3 句）
+    示例：核心贡献者，带指标的项目名称（16k+ stars），技术栈
+  - personalContext：语言、沟通偏好、关键兴趣（1-2 句）
+    示例：双语能力、特定兴趣领域、专业领域
+  - topOfMind：多个正在进行的关注点和优先级（3-5 句，详细段落）
+    示例：主要项目工作并行的技术调查、持续的学习/跟踪
+    包括：积极实现工作、问题排查、市场/研究兴趣
+    注意：这记录的是几个并发的关注领域，而非单一任务
 
-**History** (Temporal context - rich paragraphs):
-- recentMonths: Detailed summary of recent activities (4-6 sentences or 1-2 paragraphs)
-  Timeline: Last 1-3 months of interactions
-  Include: Technologies explored, projects worked on, problems solved, interests demonstrated
-- earlierContext: Important historical patterns (3-5 sentences or 1 paragraph)
-  Timeline: 3-12 months ago
-  Include: Past projects, learning journeys, established patterns
-- longTermBackground: Persistent background and foundational context (2-4 sentences)
-  Timeline: Overall/foundational information
-  Include: Core expertise, longstanding interests, fundamental working style
+  **历史**（时间上下文 - 丰富的段落）：
+  - recentMonths：近期活动的详细摘要（4-6 句或 1-2 段落）
+    时间线：过去 1-3 个月的交互
+    包括：探索的技术、进行的项目、解决的问题、展现的兴趣
+  - earlierContext：重要的历史模式（3-5 句或 1 段落）
+    时间线：3-12 个月前
+    包括：过去的项目、学习历程、已建立的模式
+  - longTermBackground：持久背景和基础上下文（2-4 句）
+    时间线：整体/基础信息
+    包括：核心专业知识、长期兴趣、基本工作风格
 
-**Facts Extraction**:
-- Extract specific, quantifiable details (e.g., "16k+ GitHub stars", "200+ datasets")
-- Include proper nouns (company names, project names, technology names)
-- Preserve technical terminology and version numbers
-- Categories:
-  * preference: Tools, styles, approaches user prefers/dislikes
-  * knowledge: Specific expertise, technologies mastered, domain knowledge
-  * context: Background facts (job title, projects, locations, languages)
-  * behavior: Working patterns, communication habits, problem-solving approaches
-  * goal: Stated objectives, learning targets, project ambitions
-- Confidence levels:
-  * 0.9-1.0: Explicitly stated facts ("I work on X", "My role is Y")
-  * 0.7-0.8: Strongly implied from actions/discussions
-  * 0.5-0.6: Inferred patterns (use sparingly, only for clear patterns)
+  **事实提取**：
+  - 提取具体、可量化的细节（例如："16k+ GitHub stars"、"200+ datasets"）
+  - 包含专有名词（公司名称、项目名称、技术名称）
+  - 保留技术术语和版本号
+  - 类别：
+    * preference：工具、风格、用户偏好/厌恶的方法
+    * knowledge：具体专业知识、掌握的技术领域知识
+    * context：背景事实（职位头衔、项目、地点、语言）
+    * behavior：工作模式、沟通习惯、解决问题的方法
+    * goal：既定目标、学习目标、项目志向
+  - 置信度级别：
+    * 0.9-1.0：明确陈述的事实（"我从事 X"、"我的角色是 Y"）
+    * 0.7-0.8：从行为/讨论中强烈暗示
+    * 0.5-0.6：推断的模式（谨慎使用，仅用于明确的模式）
 
-**What Goes Where**:
-- workContext: Current job, active projects, primary tech stack
-- personalContext: Languages, personality, interests outside direct work tasks
-- topOfMind: Multiple ongoing priorities and focus areas user cares about recently (gets updated most frequently)
-  Should capture 3-5 concurrent themes: main work, side explorations, learning/tracking interests
-- recentMonths: Detailed account of recent technical explorations and work
-- earlierContext: Patterns from slightly older interactions still relevant
-- longTermBackground: Unchanging foundational facts about the user
+  **什么内容放哪里**：
+  - workContext：当前工作、活跃项目、主要技术栈
+  - personalContext：语言、性格、直接工作之外的兴趣
+  - topOfMind：用户近期关心的多个持续优先级和关注领域（更新最频繁）
+    应捕捉 3-5 个并发主题：主要工作、边角探索、学习/跟踪兴趣
+  - recentMonths：近期技术探索和工作的详细描述
+  - earlierContext：仍相关的稍早交互模式
+  - longTermBackground：关于用户的不变基础事实
 
-**Multilingual Content**:
-- Preserve original language for proper nouns and company names
-- Keep technical terms in their original form (DeepSeek, LangGraph, etc.)
-- Note language capabilities in personalContext
+  **多语言内容**：
+  - 为专有名词和公司名称保留原始语言
+  - 保持技术术语的原始形式（DeepSeek、LangGraph 等）
+  - 在 personalContext 中记录语言能力
 
-Output Format (JSON):
-{{
-  "user": {{
-    "workContext": {{ "summary": "...", "shouldUpdate": true/false }},
-    "personalContext": {{ "summary": "...", "shouldUpdate": true/false }},
-    "topOfMind": {{ "summary": "...", "shouldUpdate": true/false }}
-  }},
-  "history": {{
-    "recentMonths": {{ "summary": "...", "shouldUpdate": true/false }},
-    "earlierContext": {{ "summary": "...", "shouldUpdate": true/false }},
-    "longTermBackground": {{ "summary": "...", "shouldUpdate": true/false }}
-  }},
-  "newFacts": [
-    {{ "content": "...", "category": "preference|knowledge|context|behavior|goal", "confidence": 0.0-1.0 }}
-  ],
-  "factsToRemove": ["fact_id_1", "fact_id_2"]
-}}
+  输出格式（JSON）：
+  {{
+    "user": {{
+      "workContext": {{ "summary": "...", "shouldUpdate": true/false }},
+      "personalContext": {{ "summary": "...", "shouldUpdate": true/false }},
+      "topOfMind": {{ "summary": "...", "shouldUpdate": true/false }}
+    }},
+    "history": {{
+      "recentMonths": {{ "summary": "...", "shouldUpdate": true/false }},
+      "earlierContext": {{ "summary": "...", "shouldUpdate": true/false }},
+      "longTermBackground": {{ "summary": "...", "shouldUpdate": true/false }}
+    }},
+    "newFacts": [
+      {{ "content": "...", "category": "preference|knowledge|context|behavior|goal", "confidence": 0.0-1.0 }}
+    ],
+    "factsToRemove": ["fact_id_1", "fact_id_2"]
+  }}
 
-Important Rules:
-- Only set shouldUpdate=true if there's meaningful new information
-- Follow length guidelines: workContext/personalContext are concise (1-3 sentences), topOfMind and history sections are detailed (paragraphs)
-- Include specific metrics, version numbers, and proper nouns in facts
-- Only add facts that are clearly stated (0.9+) or strongly implied (0.7+)
-- Remove facts that are contradicted by new information
-- When updating topOfMind, integrate new focus areas while removing completed/abandoned ones
-  Keep 3-5 concurrent focus themes that are still active and relevant
-- For history sections, integrate new information chronologically into appropriate time period
-- Preserve technical accuracy - keep exact names of technologies, companies, projects
-- Focus on information useful for future interactions and personalization
-- IMPORTANT: Do NOT record file upload events in memory. Uploaded files are
-  session-specific and ephemeral — they will not be accessible in future sessions.
-  Recording upload events causes confusion in subsequent conversations.
+  重要规则：
+  - 仅在有有意义的新信息时才设置 shouldUpdate=true
+  - 遵循长度指南：workContext/personalContext 简洁（1-3 句），topOfMind 和 history 部分详细（段落）
+  - 在事实中包含具体指标、版本号和专有名词
+  - 只添加明确陈述（0.9+）或强烈暗示（0.7+）的事实
+  - 移除被新信息矛盾的事实
+  - 更新 topOfMind 时，整合新的关注领域同时移除已完成/放弃的
+    保持 3-5 个仍活跃相关的并发关注主题
+  - 对于 history 部分，按时间顺序将新信息整合到相应时间段
+  - 保持技术准确性 - 保留技术、公司、项目的准确名称
+  - 专注于对未来交互和个性化有用的信息
+  - 重要提示：不要在记忆中记录文件上传事件。上传的文件是
+    会话特定的且临时的 — 它们在未来的会话中不可访问。
+    记录上传事件会导致后续对话中的混淆。
 
-Return ONLY valid JSON, no explanation or markdown."""
+  仅返回有效的 JSON，无需解释或 markdown。"""
 
 
 # 从单条消息中提取事实的 Prompt 模板
-FACT_EXTRACTION_PROMPT = """Extract factual information about the user from this message.
+FACT_EXTRACTION_PROMPT = """从这条消息中提取关于用户的事实信息。
 
-Message:
-{message}
+  消息：
+  {message}
 
-Extract facts in this JSON format:
-{{
-  "facts": [
-    {{ "content": "...", "category": "preference|knowledge|context|behavior|goal", "confidence": 0.0-1.0 }}
-  ]
-}}
+  按以下 JSON 格式提取事实：
+  {{
+    "facts": [
+      {{ "content": "...", "category": "preference|knowledge|context|behavior|goal", "confidence": 0.0-1.0 }}
+    ]
+  }}
 
-Categories:
-- preference: User preferences (likes/dislikes, styles, tools)
-- knowledge: User's expertise or knowledge areas
-- context: Background context (location, job, projects)
-- behavior: Behavioral patterns
-- goal: User's goals or objectives
+  类别：
+  - preference：用户偏好（喜欢/厌恶、风格、工具）
+  - knowledge：用户的专业知识或知识领域
+  - context：背景上下文（地点、工作、项目）
+  - behavior：行为模式
+  - goal：用户的目标或目的
 
-Rules:
-- Only extract clear, specific facts
-- Confidence should reflect certainty (explicit statement = 0.9+, implied = 0.6-0.8)
-- Skip vague or temporary information
+  规则：
+  - 只提取清晰、具体的事实
+  - 置信度应反映确定性（明确陈述 = 0.9+，暗示 = 0.6-0.8）
+  - 跳过模糊或临时信息
 
-Return ONLY valid JSON."""
+  仅返回有效的 JSON。"""
 
 
 def _count_tokens(text: str, encoding_name: str = "cl100k_base") -> int:
